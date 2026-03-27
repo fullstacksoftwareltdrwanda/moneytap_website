@@ -12,10 +12,10 @@ if (!$is_hosted && $is_local) {
     define('DB_NAME', 'moneytap_moneytap'); 
 }
 else {
-    // Hosted Configuration
+    // Hosted Configuration — Official MoneyTap Access
     define('DB_HOST', 'localhost');
     define('DB_USER', 'moneytap_moneytap');
-    define('DB_PASS', 'WG7-BqF5r^Oi'); // Keeping password unless the user provides a new one
+    define('DB_PASS', 'X@vHmO*+KfSS');
     define('DB_NAME', 'moneytap_moneytap');
 }
 
