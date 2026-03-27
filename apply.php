@@ -144,27 +144,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
 
 ?>
 
-<main class="min-h-screen pt-4 pb-16 px-4 font-sans bg-primary-dark text-neutral-body">
+<main class="min-h-screen pt-12 pb-16 px-4 font-outfit bg-brand-dark text-neutral-body">
     <div class="max-w-4xl mx-auto">
 
         <!-- ==================== TRACKING SECTION ==================== -->
         <div class="mb-12">
-            <div class="bg-neutral-card border border-white/5 rounded-[2rem] p-8 shadow-xl">
+            <div class="bg-brand-card border border-white/5 rounded-[2rem] p-8 shadow-xl">
                 <h2 class="text-sm font-black uppercase text-neutral-heading tracking-widest mb-1 flex items-center gap-3">
-                    <i class="fas fa-search-location text-accent-teal"></i> Track My Application
+                    <i class="fas fa-search-location text-brand-primary"></i> Track My Application
                 </h2>
                 <p class="text-[10px] text-neutral-body opacity-50 font-bold uppercase tracking-widest mb-6">Enter the email and National ID you used to apply</p>
                 <form method="POST" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input type="email" name="track_email" placeholder="Email Address" required
                             value="<?php echo isset($_POST['track_email']) ? htmlspecialchars($_POST['track_email']) : ''; ?>"
-                            class="w-full p-4 bg-primary-dark border-2 border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-accent-teal transition-all placeholder:opacity-40">
+                            class="w-full p-4 bg-brand-dark border-2 border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-brand-primary transition-all placeholder:opacity-40">
                         <input type="text" name="track_nid" placeholder="National ID Number" required
                             value="<?php echo isset($_POST['track_nid']) ? htmlspecialchars($_POST['track_nid']) : ''; ?>"
-                            class="w-full p-4 bg-primary-dark border-2 border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-accent-teal transition-all placeholder:opacity-40">
+                            class="w-full p-4 bg-brand-dark border-2 border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-brand-primary transition-all placeholder:opacity-40">
                     </div>
                     <button type="submit" name="track_code"
-                        class="w-full bg-accent-teal text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-accent-teal/20">
+                        class="w-full bg-brand-primary text-brand-dark py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-brand-primary/20">
                         <i class="fas fa-search mr-2"></i> Track My Application
                     </button>
                 </form>
@@ -253,12 +253,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="space-y-2">
-                                        <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">National ID <?php if(strpos($track_result['correction_fields'], 'id_number') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <input type="text" name="nationalId" value="<?php echo htmlspecialchars($track_result['id_number']); ?>" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'id_number') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">National ID <?php if(strpos($track_result['correction_fields'], 'id_number') !== false) echo '<span class="text-brand-primary">(Fix Required)</span>'; ?></label>
+                                        <input type="text" name="nationalId" value="<?php echo htmlspecialchars($track_result['id_number']); ?>" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'id_number') !== false ? 'border-brand-primary/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Email <?php if(strpos($track_result['correction_fields'], 'email') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <input type="email" name="email" value="<?php echo htmlspecialchars($track_result['email']); ?>" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'email') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Email <?php if(strpos($track_result['correction_fields'], 'email') !== false) echo '<span class="text-brand-primary">(Fix Required)</span>'; ?></label>
+                                        <input type="email" name="email" value="<?php echo htmlspecialchars($track_result['email']); ?>" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'email') !== false ? 'border-brand-primary/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                     </div>
                                 </div>
 
