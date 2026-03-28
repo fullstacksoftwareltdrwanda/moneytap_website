@@ -57,7 +57,7 @@ function parseMoney($moneyString) {
  * Calculate management fee per month from total disbursed
  */
 function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
-    return round($total_disbursed * ($management_fee_rate / 100), 2);
+    return round($total_disbursed * ($management_fee_rate / 100), 0);
 }
 
 /**
@@ -66,9 +66,9 @@ function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_r
 function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($deduct_fee) {
         $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
-        return round($total_disbursed - $management_fee, 2);
+        return round($total_disbursed - $management_fee, 0);
     } else {
-        return round($total_disbursed, 2);
+        return round($total_disbursed, 0);
     }
 }
 
@@ -108,7 +108,7 @@ function IPMT($rate, $period, $nper, $pv) {
 function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
-    $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 2);
+    $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 0);
     $opening_balance = $total_disbursed;
     $total_interest = 0;
     $total_management_fees = 0;

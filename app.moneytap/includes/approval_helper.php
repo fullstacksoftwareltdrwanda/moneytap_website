@@ -375,7 +375,7 @@ if (!function_exists('_helper_PPMT')) {
     function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true) {
         $schedule = [];
         $monthly_rate = $interest_rate / 100;
-        $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 2);
+        $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 0);
         $opening_balance = $total_disbursed;
         
         for ($i = 1; $i <= $term; $i++) {

@@ -35,7 +35,7 @@ function parseMoney($moneyString) {
  * This fee is charged EVERY MONTH except the first month
  */
 function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
-    return round($total_disbursed * ($management_fee_rate / 100), 2);
+    return round($total_disbursed * ($management_fee_rate / 100), 0);
 }
 
 /**
@@ -45,9 +45,9 @@ function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_r
 function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($deduct_fee) {
         $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
-        return round($total_disbursed - $management_fee, 2);
+        return round($total_disbursed - $management_fee, 0);
     } else {
-        return round($total_disbursed, 2);
+        return round($total_disbursed, 0);
     }
 }
 
@@ -100,12 +100,12 @@ function IPMT($rate, $period, $nper, $pv) {
 /**
  * Generate complete loan schedule using TOTAL DISBURSED as beginning balance
  */
-function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5) {
+function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
     
     // Calculate management fee per month
-    $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 2);
+    $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 0);
     
     // Start with TOTAL DISBURSED as opening balance
     $opening_balance = $total_disbursed;
@@ -122,13 +122,18 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
         $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
         
         if ($i == 1) {
-            // First installment: No management fee
-            $management_fee = 0;
+            $management_fee = $deduct_fee ? 0 : $management_fee_per_month;
         } else {
-            // All other installments: Management fee charged
             $management_fee = $management_fee_per_month;
+        }
+        
+        if ($management_fee > 0) {
             $total_management_fees += $management_fee;
         }
+        
+        $principal = round($principal / 10) * 10;
+        $interest = round($interest / 10) * 10;
+        $management_fee = round($management_fee / 10) * 10;
         
         $total_payment = $principal + $interest + $management_fee;
         $closing_balance = $opening_balance - $principal;
@@ -140,10 +145,10 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
         $schedule[] = [
             'instalment_number' => $i,
             'opening_balance' => round($opening_balance, 2),
-            'principal' => round($principal, 2),
-            'interest' => round($interest, 2),
-            'management_fee' => round($management_fee, 2),
-            'total_payment' => round($total_payment, 2),
+            'principal' => $principal,
+            'interest' => $interest,
+            'management_fee' => $management_fee,
+            'total_payment' => $total_payment,
             'closing_balance' => round($closing_balance, 2)
         ];
         
@@ -166,21 +171,21 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
     ];
 }
 
-function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5) {
+function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) {
         return 0;
     }
     
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee);
     return $schedule_data['monthly_payment'];
 }
 
-function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5) {
+function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) {
         return 0;
     }
     
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee);
     return $schedule_data['total_interest'];
 }
 
@@ -336,7 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $old_customer_id = intval($loan['customer_id']);
                                 
                                 // Generate loan schedule using TOTAL DISBURSED and custom rates
-                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate);
+                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee);
                                 $total_interest = $schedule_data['total_interest'];
                                 $total_management_fees = $schedule_data['total_management_fees'];
                                 $total_payment = $schedule_data['total_payment'];
@@ -517,7 +522,8 @@ $default_total_disbursed = floatval($loan['total_disbursed']);
 $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate);
 $default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
 
-$schedule_data = generateLoanSchedule($default_total_disbursed, $loan['interest_rate'], $loan['number_of_instalments'], $default_management_fee_rate);
+$deduct_fee_default = (isset($loan['deduct_fee_from_disbursed']) && $loan['deduct_fee_from_disbursed'] == '1');
+$schedule_data = generateLoanSchedule($default_total_disbursed, $loan['interest_rate'], $loan['number_of_instalments'], $default_management_fee_rate, $deduct_fee_default);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
 $default_total_management_fees = $schedule_data['total_management_fees'];
