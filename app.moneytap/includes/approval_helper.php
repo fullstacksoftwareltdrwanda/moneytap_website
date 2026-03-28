@@ -226,7 +226,7 @@ function executeApproval($conn, $approval) {
                 1,
                 NOW(),
                 NOW(),
-                " . intval($d['deduct_fee']) . "
+                " . intval($d['deduct_fee_from_disbursed'] ?? 1) . "
             )";
             
             if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error);
@@ -243,7 +243,7 @@ function executeApproval($conn, $approval) {
             _helper_createInstallmentSchedule(
                 $conn, $new_loan_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)$d['deduct_fee']
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1)
             );
 
             // Transaction
@@ -289,6 +289,7 @@ function executeApproval($conn, $approval) {
                 net_book_value = " . floatval($d['net_book_value']) . ",
                 accrued_days = " . intval($d['accrued_days']) . ",
                 loan_status = '" . $conn->real_escape_string($d['loan_status']) . "',
+                deduct_fee_from_disbursed = " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 updated_at = NOW()
             WHERE loan_id = " . intval($entity_id);
             
@@ -313,7 +314,7 @@ function executeApproval($conn, $approval) {
             _helper_createInstallmentSchedule(
                 $conn, $entity_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], true
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1)
             );
 
             // Additional update transaction

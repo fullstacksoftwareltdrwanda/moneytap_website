@@ -366,6 +366,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $error_message = "Management fee rate must be between 0% and 100%";
             } elseif ($number_of_instalments <= 0 || $number_of_instalments > 360) {
                 $error_message = "Number of instalments must be between 1 and 360";
+            } elseif (abs(($cash_amount + $bank_amount) - $loan_amount) > 0.01) {
+                $error_message = "Cash Amount + Bank Amount (" . formatMoney($cash_amount + $bank_amount) . ") must equal Net Loan Amount (" . formatMoney($loan_amount) . ")";
             } else {
                 $customer_check_query = "SELECT customer_id FROM customers WHERE customer_id = " . intval($customer_id);
                 $customer_check = mysqli_query($conn, $customer_check_query);
@@ -441,7 +443,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'collateral_net_value'   => $collateral_net_value,
                                     'is_topup'               => $is_topup,
                                     'topup_type'             => $topup_type,
-                                    'deduct_fee'             => $deduct_fee ? 1 : 0,
+                                    'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
 
@@ -677,10 +679,33 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="loan_amount" class="form-label">Amount Given to Customer</label>
+                                <label for="loan_amount" class="form-label">Amount Given to Customer (Net)</label>
                                 <input type="text" class="form-control bg-light money-display" id="loan_amount"
                                        value="<?php echo formatMoney($default_loan_amount); ?>" readonly>
                                 <small class="text-muted">Actual cash given to customer</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="cash_amount" class="form-label">Cash Amount <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control money-input" id="cash_amount" name="cash_amount" 
+                                       placeholder="0" required
+                                       value="<?php echo isset($_POST['cash_amount']) ? formatMoney(parseMoney($_POST['cash_amount'])) : '0'; ?>"
+                                       onkeyup="formatMoneyInput(this)">
+                                <small class="text-muted">Amount disbursed via Cash</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bank_amount" class="form-label">Bank Amount <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control money-input" id="bank_amount" name="bank_amount"
+                                       placeholder="0" required
+                                       value="<?php echo isset($_POST['bank_amount']) ? formatMoney(parseMoney($_POST['bank_amount'])) : '0'; ?>"
+                                       onkeyup="formatMoneyInput(this)">
+                                <small class="text-muted">Amount disbursed via Bank</small>
                             </div>
                         </div>
                     </div>
@@ -905,11 +930,25 @@ function validateTopup() {
     var topupType  = document.getElementById('topup_type').value;
     var errorEl    = document.getElementById('topupTypeError');
 
+    // 1. Validate Topup Type if checked
     if (isTopup && !topupType) {
         errorEl.style.display = 'block';
         document.getElementById('topupTypeSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return false;
     }
+
+    // 2. Validate Cash + Bank = Net Amount
+    var netAmount  = parseNumber(document.getElementById('loan_amount').value);
+    var cashAmount = parseNumber(document.getElementById('cash_amount').value);
+    var bankAmount = parseNumber(document.getElementById('bank_amount').value);
+    var totalSource = cashAmount + bankAmount;
+
+    if (Math.abs(totalSource - netAmount) > 0.01) {
+        alert("Mathematical Error: Cash + Bank (" + formatNumber(totalSource) + ") must equal Net Amount (" + formatNumber(netAmount) + "). Please adjust.");
+        document.getElementById('cash_amount').focus();
+        return false;
+    }
+
     return true;
 }
 

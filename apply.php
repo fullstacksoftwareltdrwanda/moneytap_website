@@ -189,7 +189,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                             'Rejected'       => 'fa-times-circle',
                         ][$stat] ?? 'fa-info-circle';
                     ?>
-                    <div class="mt-6 p-6 bg-primary-dark rounded-2xl border border-white/5 space-y-4">
+                    <div class="mt-6 p-6 bg-brand-dark rounded-2xl border border-white/5 space-y-4">
                         <div class="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <p class="text-[10px] text-neutral-body opacity-50 font-black uppercase tracking-widest">Applicant</p>
@@ -232,7 +232,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                         <?php endif; ?>
 
                         <!-- RESUBMISSION FORM (Hidden by default) -->
-                        <div id="correctionFormSection" class="hidden mt-8 p-8 bg-neutral-card border border-sky-500/30 rounded-3xl animate-in">
+                        <div id="correctionFormSection" class="hidden mt-8 p-8 bg-brand-card border border-sky-500/30 rounded-3xl animate-in">
                             <h3 class="text-lg font-black text-neutral-heading uppercase tracking-tighter mb-6 flex items-center gap-3">
                                 <i class="fas fa-file-signature text-sky-400"></i> Resubmit Information
                             </h3>
@@ -243,11 +243,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="space-y-2">
                                         <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Full Name <?php if(strpos($track_result['correction_fields'], 'customer_name') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <input type="text" name="customer_name" value="<?php echo htmlspecialchars($track_result['customer_name']); ?>" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'customer_name') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <input type="text" name="customer_name" value="<?php echo htmlspecialchars($track_result['customer_name']); ?>" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'customer_name') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                     </div>
                                     <div class="space-y-2">
                                         <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Phone <?php if(strpos($track_result['correction_fields'], 'phone') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <input type="text" name="phone" value="<?php echo htmlspecialchars($track_result['phone']); ?>" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'phone') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <input type="text" name="phone" value="<?php echo htmlspecialchars($track_result['phone']); ?>" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'phone') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                     </div>
                                 </div>
                                 
@@ -265,7 +265,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4 border-b border-white/5">
                                     <div class="space-y-2">
                                         <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Loan Type <?php if(strpos($track_result['correction_fields'], 'loan_type') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <select name="loan_type" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'loan_type') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <select name="loan_type" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'loan_type') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                             <option <?php if($track_result['loan_type']=='Personal') echo 'selected'; ?>>Personal</option>
                                             <option <?php if($track_result['loan_type']=='Business') echo 'selected'; ?>>Business</option>
                                             <option <?php if($track_result['loan_type']=='Salary') echo 'selected'; ?>>Salary</option>
@@ -273,7 +273,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                     </div>
                                     <div class="space-y-2">
                                         <label class="text-[9px] font-black uppercase text-neutral-body opacity-50 pl-2 tracking-widest">Amount <?php if(strpos($track_result['correction_fields'], 'requested_amount') !== false) echo '<span class="text-sky-400">(Fix Required)</span>'; ?></label>
-                                        <input type="number" name="requested_amount" value="<?php echo $track_result['requested_amount']; ?>" class="w-full p-4 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'requested_amount') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
+                                        <input type="number" name="requested_amount" value="<?php echo $track_result['requested_amount']; ?>" class="w-full p-4 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'requested_amount') !== false ? 'border-sky-500/50' : 'border-white/5'; ?> rounded-2xl text-sm font-bold text-white outline-none">
                                     </div>
                                 </div>
 
@@ -284,19 +284,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="space-y-1">
                                         <label class="text-[8px] font-black uppercase <?php echo strpos($track_result['correction_fields'], 'doc_id') !== false ? 'text-sky-400' : ''; ?>">National ID Copy</label>
-                                        <input type="file" name="doc_id" class="w-full p-3 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_id') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
+                                        <input type="file" name="doc_id" class="w-full p-3 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_id') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-[8px] font-black uppercase <?php echo strpos($track_result['correction_fields'], 'doc_contract') !== false ? 'text-sky-400' : ''; ?>">Work Contract</label>
-                                        <input type="file" name="doc_contract" class="w-full p-3 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_contract') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
+                                        <input type="file" name="doc_contract" class="w-full p-3 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_contract') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-[8px] font-black uppercase <?php echo strpos($track_result['correction_fields'], 'doc_statement') !== false ? 'text-sky-400' : ''; ?>">Bank Statement</label>
-                                        <input type="file" name="doc_statement" class="w-full p-3 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_statement') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
+                                        <input type="file" name="doc_statement" class="w-full p-3 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_statement') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-[8px] font-black uppercase <?php echo strpos($track_result['correction_fields'], 'doc_payslip') !== false ? 'text-sky-400' : ''; ?>">Latest Payslip</label>
-                                        <input type="file" name="doc_payslip" class="w-full p-3 bg-primary-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_payslip') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
+                                        <input type="file" name="doc_payslip" class="w-full p-3 bg-brand-dark border-2 <?php echo strpos($track_result['correction_fields'], 'doc_payslip') !== false ? 'border-sky-500/40' : 'border-white/5'; ?> rounded-xl text-[10px] text-white">
                                     </div>
                                 </div>
 
@@ -478,8 +478,8 @@ function goToStep2() {
     document.getElementById('step-indicator').textContent = '2';
     document.getElementById('step-title').textContent = 'Step 2 of 2';
     document.getElementById('step-desc').textContent = 'Upload Documents';
-    document.getElementById('dot1').classList.replace('bg-primary-coral','bg-white/30');
-    document.getElementById('dot2').classList.replace('bg-white/20','bg-primary-coral');
+    document.getElementById('dot1').classList.replace('bg-brand-primary','bg-white/30');
+    document.getElementById('dot2').classList.replace('bg-white/20','bg-brand-primary');
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 function goToStep1() {
@@ -488,17 +488,16 @@ function goToStep1() {
     document.getElementById('step-indicator').textContent = '1';
     document.getElementById('step-title').textContent = 'Step 1 of 2';
     document.getElementById('step-desc').textContent = 'Personal Details';
-    document.getElementById('dot1').classList.replace('bg-white/30','bg-primary-coral');
-    document.getElementById('dot2').classList.replace('bg-primary-coral','bg-white/20');
+    document.getElementById('dot1').classList.replace('bg-white/30','bg-brand-primary');
+    document.getElementById('dot2').classList.replace('bg-brand-primary','bg-white/20');
 }
 </script>
 
 <style>
 @keyframes fi { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .animate-in { animation: fi 0.5s ease-out forwards; }
-.hidden { display: none; }
 select {
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='292.4' height='292.4'%3E%3Cpath fill='%23FF6B4A' d='M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='292.4' height='292.4'%3E%3Cpath fill='%2300D094' d='M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 1.5rem top 50%; background-size: 0.65rem auto;
 }
 </style>

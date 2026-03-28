@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
     <style>
         :root {
             --primary: #00D094;
-            --primary-dark: #00B37E;
+            --brand-dark: #00B37E;
             --accent: #6366F1;
         }
         body, html {

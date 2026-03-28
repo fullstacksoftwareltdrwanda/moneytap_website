@@ -42,9 +42,13 @@ function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_r
  * Calculate loan amount from total disbursed
  * Formula: Loan Amount = Total Disbursed - Management Fee
  */
-function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
-    $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
-    return round($total_disbursed - $management_fee, 2);
+function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5, $deduct_fee = true) {
+    if ($deduct_fee) {
+        $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
+        return round($total_disbursed - $management_fee, 2);
+    } else {
+        return round($total_disbursed, 2);
+    }
 }
 
 /**
@@ -248,8 +252,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $management_fee_rate = floatval($_POST['management_fee_rate']);
         
         // CALCULATE from Total Disbursed using custom management fee rate
+        $deduct_fee = isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1';
         $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
-        $loan_amount = calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate);
+        $loan_amount = calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate, $deduct_fee);
         
         $cash_amount = parseMoney($_POST['cash_amount'] ?? '0');
         $bank_amount = parseMoney($_POST['bank_amount'] ?? '0');
@@ -277,9 +282,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $collateral_value = parseMoney($_POST['collateral_value'] ?? '0');
         $collateral_net_value = parseMoney($_POST['collateral_net_value'] ?? '0');
         
-        // Validate cash and bank amounts equal total disbursed
-        if (($cash_amount + $bank_amount) != $total_disbursed) {
-            $error_message = "Cash amount + Bank amount must equal the Total Disbursed (" . formatMoney($total_disbursed) . ").";
+        // Validate cash and bank amounts equal Net Loan Amount
+        if (abs(($cash_amount + $bank_amount) - $loan_amount) > 0.01) {
+            $error_message = "Cash amount + Bank amount (" . formatMoney($cash_amount + $bank_amount) . ") must equal the Net Loan Amount (" . formatMoney($loan_amount) . ").";
         } else {
             // Validate
             error_log("Validating dates - Disbursement: '" . $disbursement_date . "', Maturity: '" . $maturity_date . "'");
@@ -370,6 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'customer_id'            => $customer_id,
                                     'loan_number'            => $loan_number,
                                     'loan_amount'            => $loan_amount,
+                                    'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
                                     'management_fee_rate'    => $management_fee_rate,
                                     'management_fee_amount'  => $management_fee,
                                     'total_disbursed'        => $total_disbursed,
@@ -602,10 +608,26 @@ $default_total_payment = $schedule_data['total_payment'];
                         
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="loan_amount" class="form-label">Amount Given to Customer</label>
+                                <label for="loan_amount" class="form-label">Amount Given to Customer (Net)</label>
                                 <input type="text" class="form-control bg-light money-display" id="loan_amount"
                                        value="<?php echo formatMoney($default_loan_amount); ?>" readonly>
-                                <small class="text-muted">For accounting entry only</small>
+                                <small class="text-muted">Actual cash given to customer</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="deduct_fee" name="deduct_fee" value="1"
+                                        <?php echo (isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1') || 
+                                                 (!isset($_POST['deduct_fee']) && isset($loan['deduct_fee_from_disbursed']) && $loan['deduct_fee_from_disbursed'] == '1') ? 'checked' : ''; ?>
+                                        onchange="calculateFromDisbursed()">
+                                    <label class="form-check-label" for="deduct_fee">
+                                        <strong>Deduct management fee from disbursed amount</strong>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -827,13 +849,21 @@ function calculateFromDisbursed() {
     if (totalDisbursed > 0) {
         // Calculate Management Fee: Total Disbursed × Management Fee Rate%
         const managementFeePerMonth = Math.round(totalDisbursed * (managementFeeRate / 100));
+        const deductFee = document.getElementById('deduct_fee').checked;
         
-        // Calculate Loan Amount (for accounting only): Total Disbursed - Management Fee
-        const loanAmount = totalDisbursed - managementFeePerMonth;
+        // Calculate Loan Amount (for accounting only): Total Disbursed - Management Fee (if deducted)
+        const loanAmount = deductFee ? totalDisbursed - managementFeePerMonth : totalDisbursed;
         
         // Update displays
         document.getElementById('loan_amount').value = formatNumber(loanAmount);
         document.getElementById('management_fee').value = formatNumber(managementFeePerMonth);
+        
+        const feeDesc = document.querySelector('#management_fee + small');
+        if (feeDesc) {
+            feeDesc.textContent = deductFee 
+                ? 'Fee deducted upfront. No fee in first installment.' 
+                : 'Fee included in first installment. Charged in months 1-' + instalments;
+        }
         
         // Calculate schedule (using total disbursed as basis)
         if (interestRate > 0 && instalments > 0) {
@@ -844,8 +874,10 @@ function calculateFromDisbursed() {
             const avgInterest = avgBalance * monthlyRate;
             const totalInterest = Math.round(avgInterest * instalments);
             
-            // Management fee charged every month except month 1
-            const totalManagementFees = managementFeePerMonth * (instalments - 1);
+            // Management fee charged every month except month 1 if deducted upfront
+            const totalManagementFees = deductFee 
+                ? managementFeePerMonth * (instalments - 1) 
+                : managementFeePerMonth * instalments;
             
             // Approximate monthly payment
             const monthlyPayment = instalments > 1 ? Math.round((totalDisbursed + totalInterest + totalManagementFees) / instalments) : 0;
@@ -980,6 +1012,19 @@ document.getElementById('loanForm').addEventListener('submit', function(e) {
         return false;
     }
     
+    // 2. Validate Cash + Bank = Net Amount
+    const netAmount = parseNumber(document.getElementById('loan_amount').value);
+    const cashAmount = parseNumber(document.getElementById('cash_amount').value);
+    const bankAmount = parseNumber(document.getElementById('bank_amount').value);
+    const totalSource = cashAmount + bankAmount;
+
+    if (Math.abs(totalSource - netAmount) > 0.01) {
+        alert("Mathematical Error: Cash + Bank (" + formatNumber(totalSource) + ") must equal Net Amount (" + formatNumber(netAmount) + "). Please adjust.");
+        document.getElementById('cash_amount').focus();
+        e.preventDefault();
+        return false;
+    }
+
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
