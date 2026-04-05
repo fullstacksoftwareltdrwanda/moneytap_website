@@ -330,6 +330,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
                                 </div>
                             </div>
                         </div>
+                        <div class="accordion-item border-0 shadow-sm mb-3">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDocuments">
+                                    Supporting Documents
+                                </button>
+                            </h2>
+                            <div id="collapseDocuments" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Loan Clearance</label>
+                                            <input type="file" class="form-control" name="doc_loan_clearance">
+                                            <?php if (!empty($form_data['doc_loan_clearance'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_loan_clearance']; ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Power of Attorney</label>
+                                            <input type="file" class="form-control" name="doc_power_of_attorney">
+                                            <?php if (!empty($form_data['doc_power_of_attorney'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_power_of_attorney']; ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Guarantor Letter</label>
+                                            <input type="file" class="form-control" name="doc_guarantor_letter">
+                                            <?php if (!empty($form_data['doc_guarantor_letter'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_guarantor_letter']; ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-between">
