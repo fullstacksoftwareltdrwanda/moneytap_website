@@ -47,9 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve_customer_id']
         $max_code = $max_row['max_code'];
         if ($max_code) {
             $num = intval(substr($max_code, 1)) + 1;
-            $new_code = 'C' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            $new_code = 'C' . str_pad($num, 4, '0', STR_PAD_LEFT);
         } else {
-            $new_code = 'C001';
+            $new_code = 'C0001';
         }
     }
     
@@ -223,9 +223,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_customer_id'])
                             <?php if (!empty($customers_array)): ?>
                                 <?php foreach ($customers_array as $index => $customer): ?>
                                 <?php
-                                    // GLS-001 = bottom row (oldest/last in DESC order), increases upward
+                                    // GLS-0001 = bottom row (oldest/last in DESC order), increases upward
                                     $gls_number = $total - $index;
-                                    $gls_label  = 'GLS-' . str_pad($gls_number, 3, '0', STR_PAD_LEFT);
+                                    $gls_label  = 'GLS-' . str_pad($gls_number, 4, '0', STR_PAD_LEFT);
                                 ?>
                                 <tr>
                                     <td>

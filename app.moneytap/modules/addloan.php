@@ -105,10 +105,10 @@ function IPMT($rate, $period, $nper, $pv) {
     return -$remaining_balance * $rate;
 }
 
-function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true) {
+    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
-    $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 0);
+    $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
     $opening_balance = $total_disbursed;
     $total_interest = 0;
     $total_management_fees = 0;
@@ -119,10 +119,17 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
         $total_interest += $interest;
         $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
         
-        if ($i == 1) {
-            $management_fee = $deduct_fee ? 0 : $management_fee_per_month;
+        // Fee Logic
+        if ($is_disbursed) {
+            $management_fee = 0;
+        } elseif ($first_month_only) {
+            $management_fee = ($i == 1) ? $management_fee_full : 0;
         } else {
-            $management_fee = $management_fee_per_month;
+            if ($i == 1) {
+                $management_fee = $deduct_fee ? 0 : $management_fee_full;
+            } else {
+                $management_fee = $management_fee_full;
+            }
         }
         
         if ($management_fee > 0) {
@@ -168,9 +175,9 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
     ];
 }
 
-function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true) {
+function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) return 0;
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
     return $schedule_data['monthly_payment'];
 }
 
@@ -318,6 +325,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $interest_rate = floatval($_POST['interest_rate']);
         $management_fee_rate = floatval($_POST['management_fee_rate']);
         $deduct_fee = isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1';
+        $mgmt_fee_first_month_only = isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1';
+        $mgmt_fee_is_disbursed = isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1';
 
         // -------------------------------------------------------
         // TOP-UP: Capture is_topup and topup_type
@@ -444,6 +453,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'is_topup'               => $is_topup,
                                     'topup_type'             => $topup_type,
                                     'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
+                                    'mgmt_fee_first_month_only' => $mgmt_fee_first_month_only ? 1 : 0,
+                                    'mgmt_fee_is_disbursed'  => $mgmt_fee_is_disbursed ? 1 : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
 
@@ -719,6 +730,30 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="deduct_fee">
                                         <strong>Deduct management fee from disbursed amount</strong>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_is_disbursed" name="mgmt_fee_is_disbursed" value="1"
+                                        <?php echo (isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1') ? 'checked' : ''; ?>
+                                        onchange="calculateFromDisbursed()">
+                                    <label class="form-check-label" for="mgmt_fee_is_disbursed">
+                                        <strong>Management Fee is Disbursed Upfront (Month 1 Fee = 0)</strong>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
+                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
+                                        onchange="calculateFromDisbursed()">
+                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
+                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
                                     </label>
                                 </div>
                             </div>
@@ -1013,33 +1048,49 @@ function calculateFromDisbursed() {
     const managementFeeRate = parseFloat(document.getElementById('management_fee_rate').value) || 0;
     const instalments       = parseInt(document.getElementById('number_of_instalments').value) || 1;
     const deductFee         = document.getElementById('deduct_fee').checked;
+    const isFeeDisbursed    = document.getElementById('mgmt_fee_is_disbursed').checked;
+    const firstMonthOnly    = document.getElementById('mgmt_fee_first_month_only').checked;
     
     if (totalDisbursed > 0) {
-        const managementFeePerMonth = Math.round(totalDisbursed * (managementFeeRate / 100));
+        const managementFeeFull = Math.round(totalDisbursed * (managementFeeRate / 100));
         
-        let loanAmount = deductFee ? totalDisbursed - managementFeePerMonth : totalDisbursed;
+        let loanAmount = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
         
         document.getElementById('loan_amount').value    = formatNumber(loanAmount);
-        document.getElementById('management_fee').value = formatNumber(managementFeePerMonth);
+        document.getElementById('management_fee').value = formatNumber(managementFeeFull);
         
         const feeDesc = document.getElementById('fee_description');
-        feeDesc.textContent = deductFee
-            ? 'Fee deducted upfront. No fee in first installment.'
-            : 'Fee included in first installment. Charged in months 1-' + instalments;
+        if (isFeeDisbursed) {
+            feeDesc.textContent = 'Management fee fully disbursed upfront. Monthly instalments = 0 fee.';
+        } else if (firstMonthOnly) {
+            feeDesc.textContent = 'Fee applied ONLY to 1st installment. Months 2-' + instalments + ' = 0 fee.';
+        } else {
+            feeDesc.textContent = deductFee
+                ? 'Fee deducted upfront. No fee in first installment.'
+                : 'Fee included in all installments except Month 1 (deduct fee unchecked).';
+        }
         
         if (interestRate > 0 && instalments > 0) {
+            // Simplified interest calculation for UI preview
             const avgBalance    = totalDisbursed / 2;
             const avgInterest   = avgBalance * (interestRate / 100);
             const totalInterest = Math.round(avgInterest * instalments);
             
-            const totalManagementFees = deductFee
-                ? managementFeePerMonth * (instalments - 1)
-                : managementFeePerMonth * instalments;
+            let totalManagementFees = 0;
+            if (isFeeDisbursed) {
+                totalManagementFees = 0;
+            } else if (firstMonthOnly) {
+                totalManagementFees = managementFeeFull;
+            } else {
+                totalManagementFees = deductFee
+                    ? managementFeeFull * (instalments - 1)
+                    : managementFeeFull * instalments;
+            }
             
-            const monthlyPayment = instalments > 1
-                ? Math.round((totalDisbursed + totalInterest + totalManagementFees) / instalments)
-                : 0;
             const totalPayment = totalDisbursed + totalInterest + totalManagementFees;
+            const monthlyPayment = instalments > 1
+                ? Math.round(totalPayment / instalments)
+                : totalPayment;
             
             document.getElementById('monthly_payment').value = formatNumber(monthlyPayment);
             document.getElementById('total_interest').value  = formatNumber(totalInterest);
@@ -1100,6 +1151,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('interest_rate').addEventListener('input', calculateFromDisbursed);
     document.getElementById('management_fee_rate').addEventListener('input', calculateFromDisbursed);
     document.getElementById('deduct_fee').addEventListener('change', calculateFromDisbursed);
+    document.getElementById('mgmt_fee_is_disbursed').addEventListener('change', calculateFromDisbursed);
+    document.getElementById('mgmt_fee_first_month_only').addEventListener('change', calculateFromDisbursed);
     document.getElementById('number_of_instalments').addEventListener('input', function() {
         calculateFromDisbursed();
         calculateMaturityDate();

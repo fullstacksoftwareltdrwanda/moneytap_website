@@ -97,14 +97,16 @@ function executeApproval($conn, $approval) {
                 spouse_id, spouse_occupation, spouse_phone, address, location,
                 project, project_location, caution_location, loan_type, created_by,
                 has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
+                collateral_type, collateral_sub_type, upi_location, square_mtrs,
+                doc_loan_clearance, doc_power_of_attorney, doc_guarantor_letter,
                 created_at, updated_at, is_active, status
             ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
             )";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
             $d = $data;
-            $stmt->bind_param('sssssssssssssssssssssssssssssss',
+            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssss',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['record_date'], $d['phone'], $d['email'], $d['organization'],
@@ -113,7 +115,9 @@ function executeApproval($conn, $approval) {
                 $d['location'], $d['project'], $d['project_location'], $d['caution_location'],
                 $d['loan_type'], $d['created_by'],
                 $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
-                $d['guarantor_phone'], $d['guarantor_occupation']
+                $d['guarantor_phone'], $d['guarantor_occupation'],
+                $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
+                $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter']
             );
             if (!$stmt->execute()) throw new Exception($stmt->error);
             
@@ -134,17 +138,20 @@ function executeApproval($conn, $approval) {
                 phone=?, father_name=?, mother_name=?, spouse=?,
                 spouse_occupation=?, spouse_phone=?, marriage_type=?, address=?,
                 location=?, project=?, project_location=?, caution_location=?,
-                email=?, organization=?, status='Approved', is_active=1, updated_at=NOW()
+                email=?, organization=?, status='Approved', is_active=1, 
+                collateral_type=?, collateral_sub_type=?, upi_location=?, square_mtrs=?,
+                updated_at=NOW()
                 WHERE customer_id=?";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
-            $stmt->bind_param('ssssssssssssssssssssssi',
+            $stmt->bind_param('ssssssssssssssssssssssssssi',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['phone'], $d['father_name'], $d['mother_name'], $d['spouse'],
                 $d['spouse_occupation'], $d['spouse_phone'], $d['marriage_type'], $d['address'],
                 $d['location'], $d['project'], $d['project_location'], $d['caution_location'],
                 $d['email'], $d['organization'],
+                $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
                 $entity_id
             );
             if (!$stmt->execute()) throw new Exception($stmt->error);
@@ -191,7 +198,9 @@ function executeApproval($conn, $approval) {
                 accrued_days, loan_status,
                 is_topup, topup_type,
                 created_by, created_at, updated_at,
-                deduct_fee_from_disbursed
+                deduct_fee_from_disbursed,
+                mgmt_fee_first_month_only,
+                mgmt_fee_is_disbursed
             ) VALUES (
                 " . intval($d['customer_id']) . ",
                 '" . $conn->real_escape_string($d['loan_number']) . "',
@@ -226,7 +235,9 @@ function executeApproval($conn, $approval) {
                 1,
                 NOW(),
                 NOW(),
-                " . intval($d['deduct_fee_from_disbursed'] ?? 1) . "
+                " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
+                " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
+                " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . "
             )";
             
             if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error);
@@ -243,7 +254,8 @@ function executeApproval($conn, $approval) {
             _helper_createInstallmentSchedule(
                 $conn, $new_loan_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1)
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0), (bool)($d['mgmt_fee_is_disbursed'] ?? 0)
             );
 
             // Transaction
@@ -314,7 +326,8 @@ function executeApproval($conn, $approval) {
             _helper_createInstallmentSchedule(
                 $conn, $entity_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1)
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0), (bool)($d['mgmt_fee_is_disbursed'] ?? 0)
             );
 
             // Additional update transaction
@@ -372,17 +385,28 @@ if (!function_exists('_helper_PPMT')) {
         if ($rate == 0) return -$pv / $nper;
         return _helper_PMT($rate, $nper, $pv) - _helper_IPMT($rate, $period, $nper, $pv);
     }
-    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true) {
+    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
         $schedule = [];
         $monthly_rate = $interest_rate / 100;
-        $management_fee_per_month = round($total_disbursed * ($management_fee_rate / 100), 0);
+        $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
         $opening_balance = $total_disbursed;
         
         for ($i = 1; $i <= $term; $i++) {
             $interest = round($opening_balance * $monthly_rate, 2);
             $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
-            $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_per_month;
             
+            // Fee Logic: 
+            // If disbursed, fee is 0 across all months (it was taken upfront)
+            // If first_month_only, fee is full on month 1, 0 otherwise
+            // Else (default), fee is 0 on month 1 (if deduct_fee is true) and full on others
+            
+            if ($is_disbursed) {
+                $management_fee = 0;
+            } elseif ($first_month_only) {
+                $management_fee = ($i == 1) ? $management_fee_full : 0;
+            } else {
+                $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_full;
+            }
             $principal = round($principal / 10) * 10;
             $interest = round($interest / 10) * 10;
             $management_fee = round($management_fee / 10) * 10;
@@ -403,8 +427,8 @@ if (!function_exists('_helper_PPMT')) {
         }
         return $schedule;
     }
-    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true) {
-        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee);
+    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
         $disbursement_date_obj = new DateTime($disbursement_date);
         foreach ($schedule as $inst) {
             $i_num = $inst['instalment_number'];

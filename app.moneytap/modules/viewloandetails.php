@@ -509,16 +509,103 @@ body { font-size: 12px !important; background: #f4f6fb; }
     </div>
 </div>
 
+<!-- Loan Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-white border-start border-primary border-4 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-primary-subtle p-2 me-3">
+                        <i class="fas fa-hand-holding-usd text-primary fa-lg"></i>
+                    </div>
+                    <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Principal Amount</h6>
+                </div>
+                <h4 class="mb-0 fw-black text-dark">FRW <?php echo number_format($disbursement_amount, 0); ?></h4>
+                <div class="mt-2 small text-muted">Original amount disbursed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-white border-start border-warning border-4 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-warning-subtle p-2 me-3">
+                        <i class="fas fa-chart-line text-warning fa-lg"></i>
+                    </div>
+                    <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Expected Interest</h6>
+                </div>
+                <h4 class="mb-0 fw-black text-warning">FRW <?php echo number_format($loan['total_interest'] ?? 0, 0); ?></h4>
+                <div class="mt-2 small text-muted">Estimated profit from loan</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-white border-start border-info border-4 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-info-subtle p-2 me-3">
+                        <i class="fas fa-coins text-info fa-lg"></i>
+                    </div>
+                    <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Total Repayable</h6>
+                </div>
+                <h4 class="mb-0 fw-black text-info">FRW <?php echo number_format($total_exp_inst, 0); ?></h4>
+                <div class="mt-2 small text-muted">Principal + Interest + Fees</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-white border-start border-danger border-4 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-danger-subtle p-2 me-3">
+                        <i class="fas fa-exclamation-circle text-danger fa-lg"></i>
+                    </div>
+                    <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Outstanding</h6>
+                </div>
+                <h4 class="mb-0 fw-black text-danger">FRW <?php echo number_format($final_outstanding, 0); ?></h4>
+                <?php 
+                $perc_paid = $total_exp_inst > 0 ? ($total_paid / $total_exp_inst) * 100 : 0;
+                ?>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $perc_paid; ?>%"></div>
+                </div>
+                <div class="mt-1 small text-muted font-monospace d-flex justify-content-between">
+                    <span><?php echo round($perc_paid, 1); ?>% Paid</span>
+                    <span>FRW <?php echo number_format($total_paid, 0); ?></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.fw-black { font-weight: 900 !important; letter-spacing: -0.5px; }
+.ls-1 { letter-spacing: 0.5px; }
+.bg-primary-subtle { background-color: #cfe2ff; }
+.bg-warning-subtle { background-color: #fff3cd; }
+.bg-info-subtle { background-color: #cff4fc; }
+.bg-danger-subtle { background-color: #f8d7da; }
+.uppercase { text-transform: uppercase; }
+</style>
+
 <!-- Status -->
 <div class="card border-<?php echo $status_color; ?> mb-3">
     <div class="card-body py-2 d-flex justify-content-between align-items-center">
         <div>
-            <p class="text-muted mb-0 small">Loan Status</p>
-            <span class="badge bg-<?php echo $status_color; ?> mt-1" style="font-size:.82rem;padding:.3rem .7rem;">
+            <p class="text-muted mb-0 small">Current Status</p>
+            <span class="badge bg-<?php echo $status_color; ?> mt-1 shadow-sm" style="font-size:.82rem;padding:.3rem .7rem;">
+                <i class="fas <?php 
+                    if($loan_status == 'Active') echo 'fa-check-circle';
+                    elseif($status_color == 'danger') echo 'fa-exclamation-triangle';
+                    else echo 'fa-dot-circle';
+                ?> me-1"></i>
                 <?php echo htmlspecialchars($loan_status); ?>
             </span>
         </div>
-        <i class="fas fa-info-circle fa-2x text-<?php echo $status_color; ?>"></i>
+        <div class="text-end">
+            <p class="text-muted mb-0 small">Maturity Date</p>
+            <span class="fw-bold text-dark small"><i class="far fa-calendar-alt me-1"></i><?php echo fmtDate($loan['maturity_date'] ?? ''); ?></span>
+        </div>
     </div>
 </div>
 

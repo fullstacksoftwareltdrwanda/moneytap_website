@@ -59,12 +59,21 @@ if (isset($_POST['add_customer'])) {
         mkdir($upload_dir, 0777, true);
     }
 
-    $doc_id         = handle_file_upload('doc_id',       $upload_dir);
-    $doc_contract   = handle_file_upload('doc_contract', $upload_dir);
-    $doc_statement  = handle_file_upload('doc_statement',$upload_dir);
-    $doc_payslip    = handle_file_upload('doc_payslip',  $upload_dir);
-    $doc_marital    = handle_file_upload('doc_marital',  $upload_dir);
-    $doc_rdb        = handle_file_upload('doc_rdb',      $upload_dir);
+    $doc_id              = handle_file_upload('doc_id',              $upload_dir);
+    $doc_contract        = handle_file_upload('doc_contract',        $upload_dir);
+    $doc_statement       = handle_file_upload('doc_statement',       $upload_dir);
+    $doc_payslip         = handle_file_upload('doc_payslip',         $upload_dir);
+    $doc_marital         = handle_file_upload('doc_marital',         $upload_dir);
+    $doc_rdb             = handle_file_upload('doc_rdb',             $upload_dir);
+    $doc_loan_clearance  = handle_file_upload('doc_loan_clearance',  $upload_dir); // ✅ NEW
+    $doc_power_of_attorney = handle_file_upload('doc_power_of_attorney',$upload_dir); // ✅ NEW
+    $doc_guarantor_letter = handle_file_upload('doc_guarantor_letter', $upload_dir); // ✅ NEW
+
+    // ── Collateral Info ───────────────────────────────────────────────────
+    $collateral_type     = trim($_POST['collateral_type']     ?? '');
+    $collateral_sub_type = trim($_POST['collateral_sub_type'] ?? '');
+    $upi_location        = trim($_POST['upi_location']        ?? '');
+    $square_mtrs         = trim($_POST['square_mtrs']         ?? '');
 
     // Store for form re-population
     $form_data = $_POST;
@@ -73,7 +82,9 @@ if (isset($_POST['add_customer'])) {
     $errors = [];
     if (empty($customer_name)) $errors[] = "Customer Name is required.";
     if (empty($id_number))     $errors[] = "ID Number is required.";
+    if (strlen($id_number) !== 16 || !is_numeric($id_number)) $errors[] = "Invalid Rwanda ID. Must be exactly 16 numeric digits.";
     if (empty($phone))         $errors[] = "Phone is required.";
+    if (!preg_match("/^(078|079|072|073)[0-9]{7}$/", $phone)) $errors[] = "Invalid Rwanda Phone Number. Must start with 078, 079, 072, or 073 and be 10 digits.";
 
     // Validate ENUM values
     if (!in_array($gender,        ['Male', 'Female', 'Other']))          $gender        = 'Male';
@@ -84,9 +95,17 @@ if (isset($_POST['add_customer'])) {
         $error_message = implode("<br>", $errors);
     } else {
         try {
-            // ── Auto-generate customer_code (format: CUST-dd/mm/yy/hh/mm/ss) ──
+            // ── Auto-generate customer_code (format: CUST-0001) ──
             if (empty($customer_code)) {
-                $customer_code = 'CUST-' . date('d/m/y/H/i/s');
+                $max_res = $conn->query("SELECT MAX(customer_code) as max_code FROM customers WHERE customer_code LIKE 'CUST-%'");
+                $max_row = $max_res ? $max_res->fetch_assoc() : null;
+                $max_code = $max_row['max_code'] ?? '';
+                if ($max_code) {
+                    $num = intval(substr($max_code, 5)) + 1;
+                    $customer_code = 'CUST-' . str_pad($num, 4, '0', STR_PAD_LEFT);
+                } else {
+                    $customer_code = 'CUST-0001';
+                }
             }
 
             // ── APPROVAL WORKFLOW: Submit for approval instead of direct INSERT ──
@@ -122,6 +141,13 @@ if (isset($_POST['add_customer'])) {
                 'guarantor_id'        => $guarantor_id,
                 'guarantor_phone'     => $guarantor_phone,
                 'guarantor_occupation'=> $guarantor_occupation,
+                'collateral_type'     => $collateral_type,
+                'collateral_sub_type' => $collateral_sub_type,
+                'upi_location'        => $upi_location,
+                'square_mtrs'         => $square_mtrs,
+                'doc_loan_clearance'  => $doc_loan_clearance,
+                'doc_power_of_attorney' => $doc_power_of_attorney,
+                'doc_guarantor_letter' => $doc_guarantor_letter,
             ];
 
             if (submitForApproval($conn, 'add', 'customer', null, $approval_data, "Add new customer: $customer_name")) {
@@ -213,21 +239,23 @@ function handle_file_upload($field, $upload_dir) {
                         <input type="hidden" name="customer_code" value="">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Full Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="customer_name"
+                            <input type="text" class="form-control" name="customer_name" id="customer_name"
                                 value="<?php echo htmlspecialchars($form_data['customer_name'] ?? ''); ?>" required>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">ID Number <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="id_number"
+                            <input type="text" class="form-control" name="id_number" id="id_number" maxlength="16"
                                 value="<?php echo htmlspecialchars($form_data['id_number'] ?? ''); ?>" required>
+                            <small id="id_validation_msg" class="text-danger small d-none">ID must be exactly 16 digits</small>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Phone <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="phone"
+                            <input type="text" class="form-control" name="phone" id="phone" maxlength="10"
                                 value="<?php echo htmlspecialchars($form_data['phone'] ?? ''); ?>" required>
+                            <small id="phone_validation_msg" class="text-danger small d-none">Invalid Rwandan phone number</small>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Email</label>
@@ -427,6 +455,51 @@ function handle_file_upload($field, $upload_dir) {
                                 <input type="text" class="form-control" name="guarantor_occupation"
                                     value="<?php echo htmlspecialchars($form_data['guarantor_occupation'] ?? ''); ?>">
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Guarantor Supporting Document (Letter)</label>
+                                <input type="file" class="form-control" name="doc_guarantor_letter" accept=".jpg,.jpeg,.png,.pdf">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Collateral Information -->
+                    <h6 class="section-title">Collateral Information (Something Big)</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Collateral Type</label>
+                            <select class="form-select" name="collateral_type" id="collateral_type" onchange="toggleCollateralOptions()">
+                                <option value="">Select Category</option>
+                                <option value="Movable"   <?php echo ($form_data['collateral_type'] ?? '') === 'Movable' ? 'selected' : ''; ?>>Movable</option>
+                                <option value="Immovable" <?php echo ($form_data['collateral_type'] ?? '') === 'Immovable' ? 'selected' : ''; ?>>Immovable</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3 d-none" id="movable_section">
+                            <label class="form-label">Movable Asset</label>
+                            <select class="form-select" name="collateral_sub_type" id="movable_sub_type">
+                                <option value="Car" <?php echo ($form_data['collateral_sub_type'] ?? '') === 'Car' ? 'selected' : ''; ?>>Car</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3 d-none" id="immovable_section">
+                            <label class="form-label">Immovable Asset</label>
+                            <select class="form-select" name="collateral_sub_type" id="immovable_sub_type" onchange="toggleImmovableDetails()">
+                                <option value="">Select Type</option>
+                                <option value="House" <?php echo ($form_data['collateral_sub_type'] ?? '') === 'House' ? 'selected' : ''; ?>>House</option>
+                                <option value="Land"  <?php echo ($form_data['collateral_sub_type'] ?? '') === 'Land' ? 'selected' : ''; ?>>Land</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row d-none" id="land_details_section">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">UPI Location</label>
+                            <input type="text" class="form-control" name="upi_location" placeholder="e.g. 1/02/03/04/..."
+                                value="<?php echo htmlspecialchars($form_data['upi_location'] ?? ''); ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Square Mtrs</label>
+                            <input type="text" class="form-control" name="square_mtrs" placeholder="e.g. 500 sqm"
+                                value="<?php echo htmlspecialchars($form_data['square_mtrs'] ?? ''); ?>">
                         </div>
                     </div>
 
@@ -495,6 +568,14 @@ function handle_file_upload($field, $upload_dir) {
                         <div class="col-md-6 mb-3">
                             <label class="form-label">RDB Certificate</label>
                             <input type="file" class="form-control" name="doc_rdb" accept=".jpg,.jpeg,.png,.pdf">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Loan Clearance</label>
+                            <input type="file" class="form-control" name="doc_loan_clearance" accept=".jpg,.jpeg,.png,.pdf">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Power of Attorney</label>
+                            <input type="file" class="form-control" name="doc_power_of_attorney" accept=".jpg,.jpeg,.png,.pdf">
                         </div>
                     </div>
 
@@ -602,10 +683,42 @@ function toggleGuarantorSection() {
     document.getElementById('guarantor_section').classList.toggle('d-none', !show);
 }
 
+function toggleCollateralOptions() {
+    const type = document.getElementById('collateral_type').value;
+    document.getElementById('movable_section').classList.toggle('d-none', type !== 'Movable');
+    document.getElementById('immovable_section').classList.toggle('d-none', type !== 'Immovable');
+    
+    // Clear details if type changes
+    if (type !== 'Immovable') {
+        document.getElementById('land_details_section').classList.add('d-none');
+    } else {
+        toggleImmovableDetails();
+    }
+}
+
+function toggleImmovableDetails() {
+    const subtype = document.getElementById('immovable_sub_type').value;
+    document.getElementById('land_details_section').classList.toggle('d-none', subtype !== 'Land');
+}
+
+// ── Rwanda Validation ───────────────────────────────────────────────────────
+document.getElementById('id_number').addEventListener('input', function() {
+    const val = this.value;
+    const isValid = val.length === 16 && /^[0-9]+$/.test(val);
+    document.getElementById('id_validation_msg').classList.toggle('d-none', isValid || val.length === 0);
+});
+
+document.getElementById('phone').addEventListener('input', function() {
+    const val = this.value;
+    const isValid = /^(078|079|072|073)[0-9]{7}$/.test(val);
+    document.getElementById('phone_validation_msg').classList.toggle('d-none', isValid || val.length === 0);
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────
 loadRwandaData();
 toggleSpouseSection();
 toggleGuarantorSection();
+toggleCollateralOptions();
 </script>
 
 <style>

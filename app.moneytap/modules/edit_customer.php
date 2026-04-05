@@ -57,7 +57,11 @@ if ($stmt) {
         'caution_location' => $customer['caution_location'] ?? '',
         'email' => $customer['email'] ?? '',
         'organization' => $customer['organization'] ?? 'MoneyTap Ecosystem',
-        'status' => $customer['status'] ?? ($customer['is_active'] ? 'Approved' : 'Pending')
+        'status' => $customer['status'] ?? ($customer['is_active'] ? 'Approved' : 'Pending'),
+        'collateral_type'     => $customer['collateral_type'] ?? '',
+        'collateral_sub_type' => $customer['collateral_sub_type'] ?? '',
+        'upi_location'        => $customer['upi_location'] ?? '',
+        'square_mtrs'         => $customer['square_mtrs'] ?? '',
     ];
 }
 
@@ -120,6 +124,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
             'caution_location'   => $caution_location,
             'email'              => $email,
             'organization'       => $organization,
+            'collateral_type'    => $_POST['collateral_type'] ?? '',
+            'collateral_sub_type'=> $_POST['collateral_sub_type'] ?? '',
+            'upi_location'       => $_POST['upi_location'] ?? '',
+            'square_mtrs'        => $_POST['square_mtrs'] ?? '',
         ];
 
         if (submitForApproval($conn, 'edit', 'customer', $customer_id, $approval_data, "Edit customer: $customer_name")) {
@@ -238,6 +246,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
                                 </div>
                             </div>
                         </div>
+                        <div class="accordion-item border-0 shadow-sm">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCollateral">
+                                    Collateral Information
+                                </button>
+                            </h2>
+                            <div id="collapseCollateral" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Collateral Type</label>
+                                            <select class="form-select" name="collateral_type" id="collateral_type" onchange="toggleCollateralOptions()">
+                                                <option value="">Select Category</option>
+                                                <option value="Movable"   <?php echo ($form_data['collateral_type'] ?? '') === 'Movable' ? 'selected' : ''; ?>>Movable</option>
+                                                <option value="Immovable" <?php echo ($form_data['collateral_type'] ?? '') === 'Immovable' ? 'selected' : ''; ?>>Immovable</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 mb-3 <?php echo ($form_data['collateral_type'] ?? '') !== 'Movable' ? 'd-none' : ''; ?>" id="movable_section">
+                                            <label class="form-label">Movable Asset</label>
+                                            <select class="form-select" name="collateral_sub_type" id="movable_sub_type">
+                                                <option value="Car" <?php echo ($form_data['collateral_sub_type'] ?? '') === 'Car' ? 'selected' : ''; ?>>Car</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 mb-3 <?php echo ($form_data['collateral_type'] ?? '') !== 'Immovable' ? 'd-none' : ''; ?>" id="immovable_section">
+                                            <label class="form-label">Immovable Asset</label>
+                                            <select class="form-select" name="collateral_sub_type" id="immovable_sub_type" onchange="toggleImmovableDetails()">
+                                                <option value="">Select Type</option>
+                                                <option value="House" <?php echo ($form_data['collateral_sub_type'] ?? '') === 'House' ? 'selected' : ''; ?>>House</option>
+                                                <option value="Land"  <?php echo ($form_data['collateral_sub_type'] ?? '') === 'Land' ? 'selected' : ''; ?>>Land</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row <?php echo ($form_data['collateral_sub_type'] ?? '') !== 'Land' ? 'd-none' : ''; ?>" id="land_details_section">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">UPI Location</label>
+                                            <input type="text" class="form-control" name="upi_location" value="<?php echo htmlspecialchars($form_data['upi_location'] ?? ''); ?>">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Square Mtrs</label>
+                                            <input type="text" class="form-control" name="square_mtrs" value="<?php echo htmlspecialchars($form_data['square_mtrs'] ?? ''); ?>">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-between">
@@ -250,6 +303,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
     </div>
 </div>
 
+<script>
+function toggleCollateralOptions() {
+    const type = document.getElementById('collateral_type').value;
+    document.getElementById('movable_section').classList.toggle('d-none', type !== 'Movable');
+    document.getElementById('immovable_section').classList.toggle('d-none', type !== 'Immovable');
+    if (type !== 'Immovable') {
+        document.getElementById('land_details_section').classList.add('d-none');
+    } else {
+        toggleImmovableDetails();
+    }
+}
+function toggleImmovableDetails() {
+    const subtype = document.getElementById('immovable_sub_type').value;
+    document.getElementById('land_details_section').classList.toggle('d-none', subtype !== 'Land');
+}
+</script>
 <style>
 body { font-size: 13px !important; }
 .form-label { font-weight: 500; font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 2px; }
