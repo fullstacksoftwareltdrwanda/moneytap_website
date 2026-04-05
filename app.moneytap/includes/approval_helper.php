@@ -255,7 +255,7 @@ function executeApproval($conn, $approval) {
                 $conn, $new_loan_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
                 $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
-                (bool)($d['mgmt_fee_first_month_only'] ?? 0), (bool)($d['mgmt_fee_is_disbursed'] ?? 0)
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0)
             );
 
             // Transaction
@@ -303,7 +303,6 @@ function executeApproval($conn, $approval) {
                 loan_status = '" . $conn->real_escape_string($d['loan_status']) . "',
                 deduct_fee_from_disbursed = " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 mgmt_fee_first_month_only = " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
-                mgmt_fee_is_disbursed = " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . ",
                 updated_at = NOW()
             WHERE loan_id = " . intval($entity_id);
             
@@ -329,7 +328,7 @@ function executeApproval($conn, $approval) {
                 $conn, $entity_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
                 $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
-                (bool)($d['mgmt_fee_first_month_only'] ?? 0), (bool)($d['mgmt_fee_is_disbursed'] ?? 0)
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0)
             );
 
             // Additional update transaction
@@ -387,7 +386,7 @@ if (!function_exists('_helper_PPMT')) {
         if ($rate == 0) return -$pv / $nper;
         return _helper_PMT($rate, $nper, $pv) - _helper_IPMT($rate, $period, $nper, $pv);
     }
-    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
         $schedule = [];
         $monthly_rate = $interest_rate / 100;
         $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
@@ -398,13 +397,10 @@ if (!function_exists('_helper_PPMT')) {
             $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
             
             // Fee Logic: 
-            // If disbursed, fee is 0 across all months (it was taken upfront)
             // If first_month_only, fee is full on month 1, 0 otherwise
             // Else (default), fee is 0 on month 1 (if deduct_fee is true) and full on others
             
-            if ($is_disbursed) {
-                $management_fee = 0;
-            } elseif ($first_month_only) {
+            if ($first_month_only) {
                 $management_fee = ($i == 1) ? $management_fee_full : 0;
             } else {
                 $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_full;
@@ -429,8 +425,8 @@ if (!function_exists('_helper_PPMT')) {
         }
         return $schedule;
     }
-    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
-        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
+    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
+        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only);
         $disbursement_date_obj = new DateTime($disbursement_date);
         foreach ($schedule as $inst) {
             $i_num = $inst['instalment_number'];

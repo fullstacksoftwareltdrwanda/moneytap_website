@@ -737,9 +737,9 @@ $default_total_payment = $schedule_data['total_payment'];
                                        value="<?php echo formatMoney($default_management_fee); ?>" readonly>
                                 <small class="text-muted" id="fee_description">
                                     <?php 
-                                    if ($is_disbursed_default) echo "Management fee fully disbursed upfront (Month 1 = 0)";
-                                    elseif ($first_month_only_default) echo "Fee applied ONLY to 1st installment (Month 2+ = 0)";
-                                    else echo "Charged in months 2-" . $loan['number_of_instalments'];
+                                    if ($first_month_only_default) echo "Fee applied ONLY to 1st installment (Month 2+ = 0)";
+                                    elseif ($deduct_fee_default) echo "Fee deducted upfront. No fee in first installment.";
+                                    else echo "Charged in all installments.";
                                     ?>
                                 </small>
                             </div>
