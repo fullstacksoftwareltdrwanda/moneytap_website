@@ -100,7 +100,7 @@ function IPMT($rate, $period, $nper, $pv) {
 /**
  * Generate complete loan schedule using TOTAL DISBURSED as beginning balance
  */
-function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
     
@@ -122,9 +122,7 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
         $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
         
         // Fee Logic
-        if ($is_disbursed) {
-            $management_fee = 0;
-        } elseif ($first_month_only) {
+        if ($first_month_only) {
             $management_fee = ($i == 1) ? $management_fee_full : 0;
         } else {
             if ($i == 1) {
@@ -178,15 +176,15 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
     ];
 }
 
-function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) return 0;
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only);
     return $schedule_data['monthly_payment'];
 }
 
-function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) return 0;
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only);
     return $schedule_data['total_interest'];
 }
 
@@ -260,7 +258,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // CALCULATE from Total Disbursed using custom management fee rate
         $deduct_fee = isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1';
         $mgmt_fee_first_month_only = isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1';
-        $mgmt_fee_is_disbursed = isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1';
         $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
         $loan_amount = calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate, $deduct_fee);
         
@@ -344,7 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $old_customer_id = intval($loan['customer_id']);
                                 
                                 // Generate loan schedule using TOTAL DISBURSED and custom rates
-                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only, $mgmt_fee_is_disbursed);
+                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only);
                                 $total_interest = $schedule_data['total_interest'];
                                 $total_management_fees = $schedule_data['total_management_fees'];
                                 $total_payment = $schedule_data['total_payment'];
@@ -385,7 +382,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'loan_amount'            => $loan_amount,
                                     'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
                                     'mgmt_fee_first_month_only' => $mgmt_fee_first_month_only ? 1 : 0,
-                                    'mgmt_fee_is_disbursed' => $mgmt_fee_is_disbursed ? 1 : 0,
                                     'management_fee_rate'    => $management_fee_rate,
                                     'management_fee_amount'  => $management_fee,
                                     'total_disbursed'        => $total_disbursed,
@@ -437,12 +433,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Function to create installment schedule
 function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, 
-                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     try {
         error_log("Creating installment schedule for loan #$loan_number");
         
         // Generate schedule using TOTAL DISBURSED
-        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
+        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only);
         $schedule = $schedule_data['schedule'];
         
         // Parse the disbursement date
@@ -529,8 +525,7 @@ $default_management_fee = calculateManagementFeeFromDisbursed($default_total_dis
 
 $deduct_fee_default = (isset($loan['deduct_fee_from_disbursed']) && $loan['deduct_fee_from_disbursed'] == '1');
 $first_month_only_default = (isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1');
-$is_disbursed_default = (isset($loan['mgmt_fee_is_disbursed']) && $loan['mgmt_fee_is_disbursed'] == '1');
-$schedule_data = generateLoanSchedule($default_total_disbursed, $loan['interest_rate'], $loan['number_of_instalments'], $default_management_fee_rate, $deduct_fee_default, $first_month_only_default, $is_disbursed_default);
+$schedule_data = generateLoanSchedule($default_total_disbursed, $loan['interest_rate'], $loan['number_of_instalments'], $default_management_fee_rate, $deduct_fee_default, $first_month_only_default);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
 $default_total_management_fees = $schedule_data['total_management_fees'];
@@ -643,23 +638,21 @@ $default_total_payment = $schedule_data['total_payment'];
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        </div>
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_is_disbursed" name="mgmt_fee_is_disbursed" value="1"
-                                        <?php echo (isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1') ||
-                                                 (!isset($_POST['mgmt_fee_is_disbursed']) && isset($loan['mgmt_fee_is_disbursed']) && $loan['mgmt_fee_is_disbursed'] == '1') ? 'checked' : ''; ?>
+                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
+                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ||
+                                                 (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_is_disbursed">
-                                        <strong>Management Fee is Disbursed Upfront (Month 1 Fee = 0)</strong>
+                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
+                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
+                    </div>
                                         <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ||
                                                  (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">

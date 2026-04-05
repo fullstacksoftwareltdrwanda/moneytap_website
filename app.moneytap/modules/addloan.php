@@ -173,23 +173,23 @@ function IPMT($rate, $period, $nper, $pv) {
     ];
 }
 
-function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+function calculateMonthlyPayment($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) return 0;
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only, $is_disbursed);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only);
     return $schedule_data['monthly_payment'];
 }
 
-function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true) {
+function calculateTotalInterest($total_disbursed, $interest_rate, $months, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     if ($total_disbursed <= 0 || $interest_rate <= 0 || $months <= 0) return 0;
-    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee);
+    $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $months, $management_fee_rate, $deduct_fee, $first_month_only);
     return $schedule_data['total_interest'];
 }
 
 function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, 
-                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true) {
+                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     try {
         error_log("Creating installment schedule for loan #$loan_number");
-        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee);
+        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only);
         $schedule = $schedule_data['schedule'];
         $disbursement_date_obj = new DateTime($disbursement_date);
         
@@ -732,22 +732,20 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        </div>
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_is_disbursed" name="mgmt_fee_is_disbursed" value="1"
-                                        <?php echo (isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1') ? 'checked' : ''; ?>
+                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
+                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_is_disbursed">
-                                        <strong>Management Fee is Disbursed Upfront (Month 1 Fee = 0)</strong>
+                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
+                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
+                    </div>
                                         <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="mgmt_fee_first_month_only">
@@ -1046,7 +1044,6 @@ function calculateFromDisbursed() {
     const managementFeeRate = parseFloat(document.getElementById('management_fee_rate').value) || 0;
     const instalments       = parseInt(document.getElementById('number_of_instalments').value) || 1;
     const deductFee         = document.getElementById('deduct_fee').checked;
-    const isFeeDisbursed    = document.getElementById('mgmt_fee_is_disbursed').checked;
     const firstMonthOnly    = document.getElementById('mgmt_fee_first_month_only').checked;
     
     if (totalDisbursed > 0) {
@@ -1058,9 +1055,7 @@ function calculateFromDisbursed() {
         document.getElementById('management_fee').value = formatNumber(managementFeeFull);
         
         const feeDesc = document.getElementById('fee_description');
-        if (isFeeDisbursed) {
-            feeDesc.textContent = 'Management fee fully disbursed upfront. Monthly instalments = 0 fee.';
-        } else if (firstMonthOnly) {
+        if (firstMonthOnly) {
             feeDesc.textContent = 'Fee applied ONLY to 1st installment. Months 2-' + instalments + ' = 0 fee.';
         } else {
             feeDesc.textContent = deductFee
