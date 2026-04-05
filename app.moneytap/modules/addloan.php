@@ -121,7 +121,7 @@ function IPMT($rate, $period, $nper, $pv) {
         
         // Fee Logic
         if ($first_month_only) {
-            $management_fee = ($i == 1) ? $management_fee_full : 0;
+            $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
         } else {
             if ($i == 1) {
                 $management_fee = $deduct_fee ? 0 : $management_fee_full;

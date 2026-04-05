@@ -397,11 +397,11 @@ if (!function_exists('_helper_PPMT')) {
             $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
             
             // Fee Logic: 
-            // If first_month_only, fee is full on month 1, 0 otherwise
+            // If first_month_only, fee is full on month 1 UNLESS it was deducted upfront (deduct_fee = true)
             // Else (default), fee is 0 on month 1 (if deduct_fee is true) and full on others
             
             if ($first_month_only) {
-                $management_fee = ($i == 1) ? $management_fee_full : 0;
+                $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
             } else {
                 $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_full;
             }
