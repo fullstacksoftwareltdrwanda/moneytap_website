@@ -746,15 +746,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                             </div>
                         </div>
                     </div>
-                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
                     
                     <div class="row">
                         <div class="col-md-3">
