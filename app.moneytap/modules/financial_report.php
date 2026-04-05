@@ -120,13 +120,13 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
                 }
             } elseif ($account_code === '4202') {
                 // Disbursement Fee (One-time, upfront) from loan_portfolio
-                // Rule: Only counts if the very first instalment has a management fee = 0
-                $res_open = mysqli_query($conn, "SELECT SUM(management_fee_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND (SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1) = 0");
+                // Rule: Counts if deducted from disbursement OR only applied to 1st installment
+                $res_open = mysqli_query($conn, "SELECT SUM(management_fee_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
                 if ($res_open && $row_open = mysqli_fetch_assoc($res_open)) {
                     $initial_balance = -roundAmount(floatval($row_open['op'] ?? 0));
                 }
                 
-                $res_move = mysqli_query($conn, "SELECT SUM(management_fee_amount) as mp FROM loan_portfolio lp WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND IFNULL((SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1), 0) = 0");
+                $res_move = mysqli_query($conn, "SELECT SUM(management_fee_amount) as mp FROM loan_portfolio lp WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
                 if ($res_move && $row_move = mysqli_fetch_assoc($res_move)) {
                     $period_credit = roundAmount(floatval($row_move['mp'] ?? 0));
                 }
@@ -516,7 +516,7 @@ switch ($report_type) {
              FROM loan_portfolio lp2 
              WHERE lp2.customer_id = c.customer_id 
                AND lp2.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' 
-               AND IFNULL((SELECT management_fee FROM loan_instalments WHERE loan_id = lp2.loan_id AND instalment_number = 1 LIMIT 1), 0) = 0) as disb_pd,
+               AND (lp2.deduct_fee_from_disbursed = 1 OR lp2.mgmt_fee_first_month_only = 1)) as disb_pd,
             
             (SELECT SUM(af.income_amount) 
              FROM application_fees af 
@@ -588,12 +588,12 @@ switch ($report_type) {
                  li.penalty_paid
             ELSE 0 END) as period_penalty_paid,
             
-            -- Disbursement Management Fee: ONLY if instalment 1 mgmt fee is 0 or NULL
-            CASE WHEN IFNULL((SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1), 0) = 0 THEN 
+            -- Disbursement Management Fee: ONLY if upfront options are selected
+            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
                  (CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.management_fee_amount ELSE 0 END)
             ELSE 0 END as disb_fee_period,
             
-            CASE WHEN IFNULL((SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1), 0) = 0 THEN 
+            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
                  lp.management_fee_amount
             ELSE 0 END as total_disb_fee,
             
