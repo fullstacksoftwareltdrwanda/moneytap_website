@@ -105,7 +105,7 @@ function IPMT($rate, $period, $nper, $pv) {
     return -$remaining_balance * $rate;
 }
 
-    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $is_disbursed = false) {
+    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
     $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
@@ -120,9 +120,7 @@ function IPMT($rate, $period, $nper, $pv) {
         $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
         
         // Fee Logic
-        if ($is_disbursed) {
-            $management_fee = 0;
-        } elseif ($first_month_only) {
+        if ($first_month_only) {
             $management_fee = ($i == 1) ? $management_fee_full : 0;
         } else {
             if ($i == 1) {
@@ -400,7 +398,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             } else {
                                 mysqli_free_result($check_result);
                                 
-                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee);
+                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only);
                                 $total_interest = $schedule_data['total_interest'];
                                 $total_management_fees = $schedule_data['total_management_fees'];
                                 $total_payment = $schedule_data['total_payment'];
@@ -1077,9 +1075,7 @@ function calculateFromDisbursed() {
             const totalInterest = Math.round(avgInterest * instalments);
             
             let totalManagementFees = 0;
-            if (isFeeDisbursed) {
-                totalManagementFees = 0;
-            } else if (firstMonthOnly) {
+            if (firstMonthOnly) {
                 totalManagementFees = managementFeeFull;
             } else {
                 totalManagementFees = deductFee
