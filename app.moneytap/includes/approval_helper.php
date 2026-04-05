@@ -302,6 +302,8 @@ function executeApproval($conn, $approval) {
                 accrued_days = " . intval($d['accrued_days']) . ",
                 loan_status = '" . $conn->real_escape_string($d['loan_status']) . "',
                 deduct_fee_from_disbursed = " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
+                mgmt_fee_first_month_only = " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
+                mgmt_fee_is_disbursed = " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . ",
                 updated_at = NOW()
             WHERE loan_id = " . intval($entity_id);
             

@@ -62,7 +62,22 @@ if ($stmt) {
         'collateral_sub_type' => $customer['collateral_sub_type'] ?? '',
         'upi_location'        => $customer['upi_location'] ?? '',
         'square_mtrs'         => $customer['square_mtrs'] ?? '',
+        'doc_loan_clearance'  => $customer['doc_loan_clearance'] ?? '',
+        'doc_power_of_attorney'=> $customer['doc_power_of_attorney'] ?? '',
+        'doc_guarantor_letter' => $customer['doc_guarantor_letter'] ?? '',
     ];
+}
+
+// File upload helper
+function handleEditFileUpload($field_name, $upload_dir, $old_file = '') {
+    if (isset($_FILES[$field_name]) && $_FILES[$field_name]['error'] === UPLOAD_ERR_OK) {
+        $ext = pathinfo($_FILES[$field_name]['name'], PATHINFO_EXTENSION);
+        $filename = $field_name . '_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+        if (move_uploaded_file($_FILES[$field_name]['tmp_name'], $upload_dir . $filename)) {
+            return $filename;
+        }
+    }
+    return $old_file;
 }
 
 // Handle form submission
@@ -96,9 +111,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
     // Update form data for re-population
     $form_data = array_merge($form_data, $_POST);
     
+    // File Uploads
+    $upload_dir = __DIR__ . '/../uploads/documents/';
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+
+    $doc_loan_clearance   = handleEditFileUpload('doc_loan_clearance',   $upload_dir, $form_data['doc_loan_clearance']);
+    $doc_power_of_attorney= handleEditFileUpload('doc_power_of_attorney', $upload_dir, $form_data['doc_power_of_attorney']);
+    $doc_guarantor_letter = handleEditFileUpload('doc_guarantor_letter',  $upload_dir, $form_data['doc_guarantor_letter']);
+
     // Validate
-    if (empty($customer_name) || empty($id_number) || empty($phone)) {
-        $error_message = "Name, ID Number, and Phone are required.";
+    $errors = [];
+    if (empty($customer_name)) $errors[] = "Customer Name is required.";
+    if (empty($id_number)) {
+        $errors[] = "ID Number is required.";
+    } elseif (strlen($id_number) !== 16 || !is_numeric($id_number)) {
+        $errors[] = "Invalid Rwanda ID. Must be exactly 16 numeric digits.";
+    }
+    if (empty($phone)) {
+        $errors[] = "Phone is required.";
+    } elseif (!preg_match("/^(078|079|072|073)[0-9]{7}$/", $phone)) {
+        $errors[] = "Invalid Rwanda Phone. Must start with 078/079/072/073 and be 10 digits.";
+    }
+
+    if (!empty($errors)) {
+        $error_message = implode("<br>", $errors);
     } else {
         // ── APPROVAL WORKFLOW: Submit edit for approval instead of direct UPDATE ──
         $approval_data = [
@@ -128,6 +164,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
             'collateral_sub_type'=> $_POST['collateral_sub_type'] ?? '',
             'upi_location'       => $_POST['upi_location'] ?? '',
             'square_mtrs'        => $_POST['square_mtrs'] ?? '',
+            'doc_loan_clearance'  => $doc_loan_clearance,
+            'doc_power_of_attorney'=> $doc_power_of_attorney,
+            'doc_guarantor_letter' => $doc_guarantor_letter,
         ];
 
         if (submitForApproval($conn, 'edit', 'customer', $customer_id, $approval_data, "Edit customer: $customer_name")) {
@@ -171,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
                 <h6 class="mb-0 fw-bold">Update Details</h6>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Status</label>

@@ -509,6 +509,21 @@ body { font-size: 12px !important; background: #f4f6fb; }
     </div>
 </div>
 
+<?php
+// Calculate penalty-inclusive stats to display in summary cards
+$sum_penalties_due  = 0;
+$sum_penalties_paid = 0;
+$sum_schedule_bal   = 0;
+if (isset($instalments) && is_array($instalments)) {
+    foreach ($instalments as $inst_row) {
+        $sum_penalties_due  += floatval($inst_row['penalty_amount'] ?? 0);
+        $sum_penalties_paid += floatval($inst_row['penalty_paid'] ?? 0);
+        $sum_schedule_bal   += floatval($inst_row['balance_due'] ?? $inst_row['balance_remaining'] ?? 0);
+    }
+}
+$remaining_penalties = max(0, $sum_penalties_due - $sum_penalties_paid);
+$final_outstanding = $sum_schedule_bal + $remaining_penalties;
+?>
 <!-- Loan Summary Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -629,21 +644,6 @@ body { font-size: 12px !important; background: #f4f6fb; }
     <div class="card mb-3">
         <div class="card-header bg-success text-white"><h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Loan Information</h5></div>
         <div class="card-body">
-            <?php
-            // Calculate penalty-inclusive stats from installments
-            $sum_penalties_due  = 0;
-            $sum_penalties_paid = 0;
-            $sum_schedule_bal   = 0;
-            if (isset($instalments) && is_array($instalments)) {
-                foreach ($instalments as $inst_row) {
-                    $sum_penalties_due  += floatval($inst_row['penalty_amount'] ?? 0);
-                    $sum_penalties_paid += floatval($inst_row['penalty_paid'] ?? 0);
-                    $sum_schedule_bal   += floatval($inst_row['balance_due'] ?? $inst_row['balance_remaining'] ?? 0);
-                }
-            }
-            $remaining_penalties = max(0, $sum_penalties_due - $sum_penalties_paid);
-            $final_outstanding = $sum_schedule_bal + $remaining_penalties;
-            ?>
             <table class="table table-borderless mb-0">
                 <tr><td class="info-label" width="45%">Loan Number:</td><td class="fw-bold"><?php echo htmlspecialchars(isset($loan['loan_number']) ? $loan['loan_number'] : 'N/A'); ?></td></tr>
                 <tr><td class="info-label">Disbursement Amount:</td><td class="fw-bold text-primary">FRW <?php echo number_format($disbursement_amount > 0 ? $disbursement_amount : array_sum(array_column($instalments, 'principal_amount')), 2); ?></td></tr>
