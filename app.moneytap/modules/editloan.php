@@ -638,30 +638,6 @@ $default_total_payment = $schedule_data['total_payment'];
                                 </div>
                             </div>
                         </div>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
-                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ||
-                                                 (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ||
-                                                 (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="row">
