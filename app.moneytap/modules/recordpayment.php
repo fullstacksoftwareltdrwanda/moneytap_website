@@ -1429,9 +1429,10 @@ endif; ?>
                                     <td class="text-end">
                                         <?php 
                                             if ($req_amount > 0) {
-                                                echo '<span class="text-muted small">' . number_format($total_payment - $req_amount, 0) . ' + </span>';
-                                                echo '<strong>' . number_format($req_amount, 0) . '</strong><br>';
+                                                echo '<div class="d-flex flex-column align-items-end">';
+                                                echo '<span class="badge bg-info text-dark mb-1" style="font-size: 0.65rem;">+ ' . number_format($req_amount, 0) . ' (2% Fee)</span>';
                                                 echo '<span class="fw-bold">FRW ' . number_format($total_payment, 0) . '</span>';
+                                                echo '</div>';
                                             } else {
                                                 echo number_format($total_payment, 0);
                                             }
