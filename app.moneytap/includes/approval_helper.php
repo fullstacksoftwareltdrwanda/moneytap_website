@@ -184,6 +184,10 @@ function executeApproval($conn, $approval) {
                 ? "'" . $conn->real_escape_string($d['topup_type']) . "'"
                 : "NULL";
 
+            $requested_amount  = floatval($d['requested_amount'] ?? 0);
+            $is_paid_upfront   = intval($d['is_requested_paid_upfront'] ?? 0);
+            $requested_status  = $is_paid_upfront ? 'Paid' : 'Added to Installment';
+
             $sql = "INSERT INTO loan_portfolio (
                 customer_id, loan_number, loan_amount, 
                 management_fee_rate, management_fee_amount, total_disbursed,
@@ -200,7 +204,8 @@ function executeApproval($conn, $approval) {
                 created_by, created_at, updated_at,
                 deduct_fee_from_disbursed,
                 mgmt_fee_first_month_only,
-                mgmt_fee_is_disbursed
+                mgmt_fee_is_disbursed,
+                requested_amount, is_requested_paid_upfront, requested_amount_status
             ) VALUES (
                 " . intval($d['customer_id']) . ",
                 '" . $conn->real_escape_string($d['loan_number']) . "',
@@ -237,7 +242,8 @@ function executeApproval($conn, $approval) {
                 NOW(),
                 " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
-                " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . "
+                " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . ",
+                $requested_amount, $is_paid_upfront, '$requested_status'
             )";
             
             if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error);
@@ -251,11 +257,15 @@ function executeApproval($conn, $approval) {
                 WHERE customer_id = " . intval($d['customer_id']));
 
             // Installment schedule
+            // If NOT paid upfront, add the requested_amount to the first installment
+            $requested_to_add = $is_paid_upfront ? 0 : $requested_amount;
             _helper_createInstallmentSchedule(
                 $conn, $new_loan_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
-                (bool)($d['mgmt_fee_first_month_only'] ?? 0)
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], 
+                (bool)($d['deduct_fee_from_disbursed'] ?? 1),
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0),
+                $requested_to_add
             );
 
             // Transaction
@@ -264,7 +274,7 @@ function executeApproval($conn, $approval) {
                 $d['disbursement_date'], $d['total_disbursed'], "Loan disbursement", 1
             );
             require_once __DIR__ . '/activity_logger.php';
-            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} for customer ID: {$d['customer_id']}");
+            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($is_paid_upfront ? "PAID" : "ADDED TO INSTALLMENT"));
             break;
         }
 
@@ -303,6 +313,9 @@ function executeApproval($conn, $approval) {
                 loan_status = '" . $conn->real_escape_string($d['loan_status']) . "',
                 deduct_fee_from_disbursed = " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 mgmt_fee_first_month_only = " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
+                requested_amount = " . floatval($d['requested_amount'] ?? 0) . ",
+                is_requested_paid_upfront = " . intval($d['is_requested_paid_upfront'] ?? 0) . ",
+                requested_amount_status = '" . (($d['is_requested_paid_upfront'] ?? 0) ? 'Paid' : 'Added to Installment') . "',
                 updated_at = NOW()
             WHERE loan_id = " . intval($entity_id);
             
@@ -327,8 +340,10 @@ function executeApproval($conn, $approval) {
             _helper_createInstallmentSchedule(
                 $conn, $entity_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
-                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], (bool)($d['deduct_fee_from_disbursed'] ?? 1),
-                (bool)($d['mgmt_fee_first_month_only'] ?? 0)
+                $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], 
+                (bool)($d['deduct_fee_from_disbursed'] ?? 1),
+                (bool)($d['mgmt_fee_first_month_only'] ?? 0),
+                (($d['is_requested_paid_upfront'] ?? 0) ? 0 : ($d['requested_amount'] ?? 0))
             );
 
             // Additional update transaction
@@ -386,7 +401,7 @@ if (!function_exists('_helper_PPMT')) {
         if ($rate == 0) return -$pv / $nper;
         return _helper_PMT($rate, $nper, $pv) - _helper_IPMT($rate, $period, $nper, $pv);
     }
-    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
+    function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0) {
         $schedule = [];
         $monthly_rate = $interest_rate / 100;
         $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
@@ -396,20 +411,20 @@ if (!function_exists('_helper_PPMT')) {
             $interest = round($opening_balance * $monthly_rate, 2);
             $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
             
-            // Fee Logic: 
-            // If first_month_only, fee is full on month 1 UNLESS it was deducted upfront (deduct_fee = true)
-            // Else (default), fee is 0 on month 1 (if deduct_fee is true) and full on others
-            
             if ($first_month_only) {
                 $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
             } else {
                 $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_full;
             }
+
+            // Requested Amount logic: only added to Month 1 if provided (not paid upfront)
+            $requested_fee = ($i == 1) ? $requested_amount : 0;
+            
             $principal = round($principal / 10) * 10;
             $interest = round($interest / 10) * 10;
             $management_fee = round($management_fee / 10) * 10;
             
-            $total_payment = $principal + $interest + $management_fee;
+            $total_payment = $principal + $interest + $management_fee + $requested_fee;
             $closing_balance = max(0, $opening_balance - $principal);
             
             $schedule[] = [
@@ -418,6 +433,7 @@ if (!function_exists('_helper_PPMT')) {
                 'principal' => $principal,
                 'interest' => $interest,
                 'management_fee' => $management_fee,
+                'requested_amount' => $requested_fee,
                 'total_payment' => $total_payment,
                 'closing_balance' => round($closing_balance, 2)
             ];
@@ -425,18 +441,15 @@ if (!function_exists('_helper_PPMT')) {
         }
         return $schedule;
     }
-    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
-        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only);
+    function _helper_createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, $number_of_instalments, 
+                                             $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, 
+                                             $deduct_fee = true, $first_month_only = false, $requested_amount = 0) {
+        $schedule = _helper_generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $requested_amount);
         $disbursement_date_obj = new DateTime($disbursement_date);
         foreach ($schedule as $inst) {
             $i_num = $inst['instalment_number'];
-            
-            // Check if this instalment already exists (e.g. it was kept because it had payments)
             $check = $conn->query("SELECT instalment_id FROM loan_instalments WHERE loan_id = " . intval($loan_id) . " AND instalment_number = " . intval($i_num));
-            if ($check && $check->num_rows > 0) {
-                // Already exists, skip insertion to prevent duplication
-                continue;
-            }
+            if ($check && $check->num_rows > 0) continue;
 
             $due_date_obj = clone $disbursement_date_obj;
             $due_date_obj->modify("+$i_num months");
@@ -444,12 +457,12 @@ if (!function_exists('_helper_PPMT')) {
             
             $conn->query("INSERT INTO loan_instalments (
                 loan_id, loan_number, instalment_number, due_date, opening_balance,
-                principal_amount, interest_amount, management_fee, total_payment, closing_balance,
+                principal_amount, interest_amount, management_fee, requested_amount, total_payment, closing_balance,
                 paid_amount, principal_paid, interest_paid, management_fee_paid,
                 balance_remaining, status, days_overdue, penalty_amount, created_by, created_at
             ) VALUES (
                 ".intval($loan_id).", '".$conn->real_escape_string($loan_number)."', $i_num, '$due_date', ".floatval($inst['opening_balance']).",
-                ".floatval($inst['principal']).", ".floatval($inst['interest']).", ".floatval($inst['management_fee']).", ".floatval($inst['total_payment']).", ".floatval($inst['closing_balance']).",
+                ".floatval($inst['principal']).", ".floatval($inst['interest']).", ".floatval($inst['management_fee']).", ".floatval($inst['requested_amount'] ?? 0).", ".floatval($inst['total_payment']).", ".floatval($inst['closing_balance']).",
                 0, 0, 0, 0, ".floatval($inst['total_payment']).", 'Pending', 0, 0, ".intval($user_id).", NOW()
             )");
         }

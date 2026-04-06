@@ -407,6 +407,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'net_book_value'         => $net_book_value,
                                     'accrued_days'           => $accrued_days,
                                     'loan_status'            => $loan_status,
+                                    'requested_amount'       => parseMoney($_POST['requested_amount'] ?? '0'),
+                                    'is_requested_paid_upfront' => isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0,
                                     'old_loan_amount'        => $old_loan_amount,
                                     'old_customer_id'        => $old_customer_id
                                 ];
@@ -614,12 +616,28 @@ $default_total_payment = $schedule_data['total_payment'];
                             </div>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="mb-3">
                                 <label for="loan_amount" class="form-label">Amount Given to Customer (Net)</label>
                                 <input type="text" class="form-control bg-light money-display" id="loan_amount"
                                        value="<?php echo formatMoney($default_loan_amount); ?>" readonly>
                                 <small class="text-muted">Actual cash given to customer</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="requested_amount" class="form-label"><strong>Requested Amount (2%)</strong></label>
+                                <input type="text" class="form-control bg-light money-display" id="requested_amount" 
+                                       name="requested_amount" readonly
+                                       value="<?php echo formatMoney($loan['requested_amount'] ?? 0); ?>">
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1"
+                                        <?php echo (isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1') || 
+                                                 (!isset($_POST['is_requested_paid_upfront']) && isset($loan['is_requested_paid_upfront']) && $loan['is_requested_paid_upfront'] == '1') ? 'checked' : ''; ?>>
+                                    <label class="form-check-label text-success" for="is_requested_paid_upfront">
+                                        <small><strong>Paid Upfront (Asset)</strong></small>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -878,11 +896,13 @@ function calculateFromDisbursed() {
     
     if (totalDisbursed > 0) {
         const managementFeeFull = Math.round(totalDisbursed * (managementFeeRate / 100));
+        const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Requested Amount
         
         let loanAmount = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
         
         document.getElementById('loan_amount').value    = formatNumber(loanAmount);
         document.getElementById('management_fee').value = formatNumber(managementFeeFull);
+        document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
         
         const feeDesc = document.getElementById('fee_description');
         if (isFeeDisbursed) {

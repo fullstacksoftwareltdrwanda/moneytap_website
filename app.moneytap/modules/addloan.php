@@ -280,9 +280,11 @@ $loan_number = "LN-" . date('Ymd-His');
 // DEFAULT VALUES
 $default_total_disbursed = 2110000;
 $default_management_fee_rate = 5.5;
+$default_requested_amount_rate = 2.0; // New 2% Requested Amount
 $default_deduct_fee = true;
 $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
 $default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
+$default_requested_amount = round($default_total_disbursed * ($default_requested_amount_rate / 100), 0);
 $default_rate = 5.0;
 $default_instalments = 6;
 
@@ -453,6 +455,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
                                     'mgmt_fee_first_month_only' => $mgmt_fee_first_month_only ? 1 : 0,
                                     'mgmt_fee_is_disbursed'  => $mgmt_fee_is_disbursed ? 1 : 0,
+                                    'requested_amount'       => parseMoney($_POST['requested_amount'] ?? '0'),
+                                    'is_requested_paid_upfront' => isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
 
@@ -766,7 +770,22 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                        name="management_fee_rate" step="0.1" min="0" max="100" required
                                        value="<?php echo isset($_POST['management_fee_rate']) ? htmlspecialchars($_POST['management_fee_rate']) : number_format($default_management_fee_rate, 1, '.', ''); ?>"
                                        onchange="calculateFromDisbursed()" onkeyup="calculateFromDisbursed()">
-                                <small class="text-muted">Customizable fee rate</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="requested_amount" class="form-label text-primary"><strong>Requested Amount (2%)</strong></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control money-input bg-light" id="requested_amount"
+                                           name="requested_amount" readonly
+                                           value="<?php echo formatMoney($default_requested_amount); ?>">
+                                </div>
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1">
+                                    <label class="form-check-label text-success" for="is_requested_paid_upfront">
+                                        <small><strong>Paid Upfront (Asset)</strong></small>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-2">
@@ -1040,11 +1059,13 @@ function calculateFromDisbursed() {
     
     if (totalDisbursed > 0) {
         const managementFeeFull = Math.round(totalDisbursed * (managementFeeRate / 100));
+        const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Requested Amount
         
         let loanAmount = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
         
         document.getElementById('loan_amount').value    = formatNumber(loanAmount);
         document.getElementById('management_fee').value = formatNumber(managementFeeFull);
+        document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
         
         const feeDesc = document.getElementById('fee_description');
         if (firstMonthOnly) {

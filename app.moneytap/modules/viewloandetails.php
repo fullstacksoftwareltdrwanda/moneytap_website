@@ -646,6 +646,9 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
         <div class="card-body">
             <table class="table table-borderless mb-0">
                 <tr><td class="info-label" width="45%">Loan Number:</td><td class="fw-bold"><?php echo htmlspecialchars(isset($loan['loan_number']) ? $loan['loan_number'] : 'N/A'); ?></td></tr>
+                <?php if (isset($loan['requested_amount']) && $loan['requested_amount'] > 0): ?>
+                <tr class="bg-primary-subtle rounded"><td class="info-label fw-bold">Requested Amount (2%):</td><td class="fw-bold text-primary">FRW <?php echo number_format($loan['requested_amount'], 2); ?> (<?php echo htmlspecialchars($loan['requested_amount_status'] ?? 'Pending'); ?>)</td></tr>
+                <?php endif; ?>
                 <tr><td class="info-label">Disbursement Amount:</td><td class="fw-bold text-primary">FRW <?php echo number_format($disbursement_amount > 0 ? $disbursement_amount : array_sum(array_column($instalments, 'principal_amount')), 2); ?></td></tr>
                 <tr class="border-top"><td class="info-label">Total Expected (Schedule):</td><td class="fw-bold">FRW <?php echo number_format($total_exp_inst > 0 ? $total_exp_inst : array_sum(array_column($instalments, 'total_amount')), 2); ?></td></tr>
                 <tr><td class="info-label">Already Paid:</td><td class="fw-bold text-success">FRW <?php echo number_format($total_paid, 2); ?></td></tr>
