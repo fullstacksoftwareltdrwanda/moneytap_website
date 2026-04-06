@@ -1378,6 +1378,7 @@ endif; ?>
         $due_date = $inst['due_date'];
         $opening_balance = floatval($inst['opening_balance']);
         $principal = floatval($inst['principal_amount']);
+        $interest = floatval($inst['interest_amount']);
         $mgmt_fee = floatval($inst['management_fee']);
         $req_amount = floatval($inst['requested_amount'] ?? 0);
         $total_payment = floatval($inst['total_payment']);
@@ -1425,7 +1426,17 @@ endif; ?>
                                     <td class="text-end"><?php echo number_format($interest, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($mgmt_fee, 0); ?></td>
                                     <td class="text-end fw-bold text-primary" style="background:#e7f3ff;"><?php echo $req_amount > 0 ? number_format($req_amount, 0) : '—'; ?></td>
-                                    <td class="text-end"><?php echo number_format($total_payment, 0); ?></td>
+                                    <td class="text-end">
+                                        <?php 
+                                            if ($req_amount > 0) {
+                                                echo '<span class="text-muted small">' . number_format($total_payment - $req_amount, 0) . ' + </span>';
+                                                echo '<strong>' . number_format($req_amount, 0) . '</strong><br>';
+                                                echo '<span class="fw-bold">FRW ' . number_format($total_payment, 0) . '</span>';
+                                            } else {
+                                                echo number_format($total_payment, 0);
+                                            }
+                                        ?>
+                                    </td>
                                     <td class="text-end"><?php echo number_format($closing_balance, 0); ?></td>
                                 </tr>
                                 <?php
