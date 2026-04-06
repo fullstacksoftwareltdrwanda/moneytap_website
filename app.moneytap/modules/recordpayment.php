@@ -374,17 +374,19 @@ try {
                                  principal_paid      = principal_paid + ?,
                                  interest_paid       = interest_paid + ?,
                                  management_fee_paid = management_fee_paid + ?,
+                                 requested_amount_paid = requested_amount_paid + ?,
                                  balance_remaining   = ?,
                                  status              = ?,
                                  payment_date        = ?,
                                  updated_at          = NOW()
                              WHERE instalment_id = ?"
                         );
-                        $upd->bind_param("dddddssi",
+                        $upd->bind_param("ddddddssi",
                             $instalment_paid,
                             $principal_paid_now,
                             $interest_paid_now,
                             $mgmt_paid_now,
+                            $req_paid_now,
                             $new_balance,
                             $new_status,
                             $payment_date,
@@ -490,6 +492,48 @@ try {
                             'credit_amount' => $total_mgmt_credited,
                             'movement' => $total_mgmt_credited,
                             'ending_balance' => $m_beg + $total_mgmt_credited,
+                            'reference_type' => 'loan_prepayment',
+                            'reference_id' => $current_inst_id,
+                            'created_by' => $created_by
+                        ]);
+                    }
+
+                    if ($total_req_amount_credited > 0) {
+                        // Credit Requested Amount Income (4203)
+                        $req_inc_beg = getBeginningBalance($conn, '4203', $payment_date);
+                        createLedgerEntry($conn, [
+                            'transaction_date' => $payment_date,
+                            'class' => 'Fee Income',
+                            'account_code' => '4203',
+                            'account_name' => 'Requested Amount Income (2%)',
+                            'particular' => 'Requested Amount Fee Prepayment',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $req_inc_beg,
+                            'debit_amount' => 0,
+                            'credit_amount' => $total_req_amount_credited,
+                            'movement' => $total_req_amount_credited,
+                            'ending_balance' => $req_inc_beg + $total_req_amount_credited,
+                            'reference_type' => 'loan_prepayment',
+                            'reference_id' => $current_inst_id,
+                            'created_by' => $created_by
+                        ]);
+
+                        // Credit Requested Amount Receivable (1202)
+                        $req_rec_beg = getBeginningBalance($conn, '1202', $payment_date);
+                        createLedgerEntry($conn, [
+                            'transaction_date' => $payment_date,
+                            'class' => 'Assets',
+                            'account_code' => '1202',
+                            'account_name' => 'Requested Amount Receivable',
+                            'particular' => 'Requested Amount Receivable Prepayment',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $req_rec_beg,
+                            'debit_amount' => 0,
+                            'credit_amount' => $total_req_amount_credited,
+                            'movement' => -$total_req_amount_credited,
+                            'ending_balance' => $req_rec_beg - $total_req_amount_credited,
                             'reference_type' => 'loan_prepayment',
                             'reference_id' => $current_inst_id,
                             'created_by' => $created_by
