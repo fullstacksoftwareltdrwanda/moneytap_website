@@ -448,13 +448,31 @@ if (!function_exists('_helper_PPMT')) {
         $disbursement_date_obj = new DateTime($disbursement_date);
         foreach ($schedule as $inst) {
             $i_num = $inst['instalment_number'];
-            $check = $conn->query("SELECT instalment_id FROM loan_instalments WHERE loan_id = " . intval($loan_id) . " AND instalment_number = " . intval($i_num));
-            if ($check && $check->num_rows > 0) continue;
-
+            
             $due_date_obj = clone $disbursement_date_obj;
             $due_date_obj->modify("+$i_num months");
             $due_date = $due_date_obj->format('Y-m-d');
+
+            $check = $conn->query("SELECT instalment_id FROM loan_instalments WHERE loan_id = " . intval($loan_id) . " AND instalment_number = " . intval($i_num));
             
+            if ($check && $check->num_rows > 0) {
+                // UPDATE existing record that has NO payments
+                $conn->query("UPDATE loan_instalments SET 
+                    due_date = '$due_date',
+                    opening_balance = ".floatval($inst['opening_balance']).",
+                    principal_amount = ".floatval($inst['principal']).",
+                    interest_amount = ".floatval($inst['interest']).",
+                    management_fee = ".floatval($inst['management_fee']).",
+                    requested_amount = ".floatval($inst['requested_amount'] ?? 0).",
+                    total_payment = ".floatval($inst['total_payment']).",
+                    closing_balance = ".floatval($inst['closing_balance']).",
+                    balance_remaining = total_payment - paid_amount,
+                    updated_at = NOW()
+                    WHERE loan_id = ".intval($loan_id)." AND instalment_number = ".intval($i_num)."
+                    AND instalment_id NOT IN (SELECT loan_instalment_id FROM loan_payments)");
+                continue;
+            }
+
             $conn->query("INSERT INTO loan_instalments (
                 loan_id, loan_number, instalment_number, due_date, opening_balance,
                 principal_amount, interest_amount, management_fee, requested_amount, total_payment, closing_balance,

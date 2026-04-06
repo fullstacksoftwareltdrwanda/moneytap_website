@@ -81,7 +81,8 @@ $instalments = array();
 if ($check_instalments_table && $check_instalments_table->num_rows > 0) {
     $s = $conn->prepare(
         "SELECT instalment_id, loan_id, instalment_number, due_date,
-                principal_amount, interest_amount, management_fee as fees_amount, total_payment as total_amount,
+                principal_amount, interest_amount, management_fee as fees_amount, 
+                requested_amount, total_payment as total_amount,
                 paid_amount as amount_paid, balance_remaining as balance_due, balance_remaining,
                 penalty_amount, penalty_paid,
                 status as payment_status, payment_date as paid_date,
@@ -755,6 +756,83 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
     </div>
 </div>
 <?php endif; ?>
+
+<!-- ══════════════════════════════════════════════════════════════
+     CURRENT INSTALMENT SCHEDULE
+══════════════════════════════════════════════════════════════════ -->
+<div class="card mb-4 border-0 shadow-sm rounded-3">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2 px-3">
+        <h5 class="mb-0 fs-6 fw-bold text-uppercase ls-1"><i class="fas fa-calendar-alt me-2 text-primary"></i>Repayment Schedule</h5>
+        <span class="badge bg-primary bg-opacity-75 px-3 rounded-pill"><?php echo count($instalments); ?> Months</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size:0.85rem;">
+                <thead class="bg-light shadow-sm">
+                    <tr class="text-secondary small text-uppercase fw-bold">
+                        <th class="ps-3 text-center" width="70">#</th>
+                        <th>Due Date</th>
+                        <th class="text-end">Principal</th>
+                        <th class="text-end">Interest</th>
+                        <th class="text-end">Mgmt Fee</th>
+                        <th class="text-end bg-primary-subtle text-primary border-start border-end border-primary border-opacity-10" width="160">Requested Amt</th>
+                        <th class="text-end fw-black">Total Due</th>
+                        <th class="text-end text-success">Paid</th>
+                        <th class="text-end text-danger fw-bold pe-3">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php 
+                foreach ($instalments as $idx => $inst): 
+                    $inst_st = $inst['payment_status'] ?? 'Pending';
+                    $row_class = '';
+                    if ($inst_st === 'Paid') $row_class = 'opacity-75 bg-light';
+                    elseif (strtotime($inst['due_date']) < time() && $inst_st !== 'Paid') $row_class = 'bg-danger-subtle bg-opacity-25';
+                ?>
+                <tr class="<?php echo $row_class; ?>">
+                    <td class="text-center text-muted small ps-3">M-<?php echo $inst['instalment_number']; ?></td>
+                    <td class="fw-bold"><?php echo fmtDate($inst['due_date']); ?></td>
+                    <td class="text-end"><?php echo number_format($inst['principal_amount'], 0); ?></td>
+                    <td class="text-end"><?php echo number_format($inst['interest_amount'], 0); ?></td>
+                    <td class="text-end"><?php echo number_format($inst['fees_amount'], 0); ?></td>
+                    <td class="text-end bg-primary-subtle border-start border-end border-primary border-opacity-10 py-1">
+                        <?php if (isset($inst['requested_amount']) && $inst['requested_amount'] > 0): ?>
+                            <div class="d-flex flex-column align-items-end">
+                                <span class="badge bg-primary px-3 shadow-sm pulse-blue mb-0">
+                                    FRW <?php echo number_format($inst['requested_amount'], 0); ?>
+                                </span>
+                                <small class="text-primary fw-bold" style="font-size:0.6rem;">REQUIRED 2% FEE</small>
+                            </div>
+                        <?php else: ?>
+                            <span class="text-muted opacity-50 small">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="text-end fw-black text-primary">FRW <?php echo number_format($inst['total_amount'], 0); ?></td>
+                    <td class="text-end text-success fw-bold"><?php echo number_format($inst['amount_paid'], 0); ?></td>
+                    <td class="text-end text-danger fw-black pe-3" style="font-size:1.05rem;">
+                        FRW <?php echo number_format($inst['balance_due'], 0); ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.fw-black { font-weight: 900 !important; }
+.ls-1 { letter-spacing: 0.5px; }
+.bg-primary-subtle { background-color: #e7f1ff !important; }
+.pulse-blue {
+    animation: blue-pulse 2s infinite;
+}
+@keyframes blue-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(13, 110, 253, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
+}
+</style>
 
 <!-- Accounting entries -->
 <?php if (!empty($accounting_entries)): ?>
