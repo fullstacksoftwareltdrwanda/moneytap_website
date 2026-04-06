@@ -1381,7 +1381,8 @@ endif; ?>
         $interest = floatval($inst['interest_amount']);
         $mgmt_fee = floatval($inst['management_fee']);
         $req_amount = floatval($inst['requested_amount'] ?? 0);
-        $total_payment = floatval($inst['total_payment']);
+        // Force calculation to ensure Requested amount is always included
+        $total_payment = $principal + $interest + $mgmt_fee + $req_amount;
         $closing_balance = floatval($inst['closing_balance']);
         $paid_amount = floatval($inst['paid_amount']);
         $balance = floatval($inst['balance_remaining']);
@@ -1451,7 +1452,13 @@ endif; ?>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'interest_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'management_fee')), 0); ?></th>
                                     <th class="text-end text-primary"><?php echo number_format(array_sum(array_column($existing_instalments, 'requested_amount')), 0); ?></th>
-                                    <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'total_payment')), 0); ?></th>
+                                    <th class="text-end"><?php 
+                                        $grand_p = array_sum(array_column($existing_instalments, 'principal_amount'));
+                                        $grand_i = array_sum(array_column($existing_instalments, 'interest_amount'));
+                                        $grand_m = array_sum(array_column($existing_instalments, 'management_fee'));
+                                        $grand_r = array_sum(array_column($existing_instalments, 'requested_amount'));
+                                        echo number_format($grand_p + $grand_i + $grand_m + $grand_r, 0); 
+                                    ?></th>
                                     <th class="text-end">-</th>
                                 </tr>
                             </tfoot>

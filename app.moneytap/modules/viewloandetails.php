@@ -82,7 +82,7 @@ if ($check_instalments_table && $check_instalments_table->num_rows > 0) {
     $s = $conn->prepare(
         "SELECT instalment_id, loan_id, instalment_number, due_date,
                 principal_amount, interest_amount, management_fee as fees_amount, 
-                requested_amount, total_payment as total_amount,
+                requested_amount, total_payment,
                 paid_amount as amount_paid, balance_remaining as balance_due, balance_remaining,
                 penalty_amount, penalty_paid,
                 status as payment_status, payment_date as paid_date,
@@ -807,7 +807,14 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                             <span class="text-muted opacity-50 small">—</span>
                         <?php endif; ?>
                     </td>
-                    <td class="text-end fw-black text-primary">FRW <?php echo number_format($inst['total_amount'], 0); ?></td>
+                    <?php
+                        // Always compute total from parts so Requested Amount is always included
+                        $computed_total = floatval($inst['principal_amount'])
+                                        + floatval($inst['interest_amount'])
+                                        + floatval($inst['fees_amount'])
+                                        + floatval($inst['requested_amount'] ?? 0);
+                    ?>
+                    <td class="text-end fw-black text-primary">FRW <?php echo number_format($computed_total, 0); ?></td>
                     <td class="text-end text-success fw-bold"><?php echo number_format($inst['amount_paid'], 0); ?></td>
                     <td class="text-end text-danger fw-black pe-3" style="font-size:1.05rem;">
                         FRW <?php echo number_format($inst['balance_due'], 0); ?>
