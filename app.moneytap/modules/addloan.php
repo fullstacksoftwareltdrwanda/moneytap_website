@@ -1091,10 +1091,13 @@ function calculateFromDisbursed() {
                     : managementFeeFull * instalments;
             }
             
-            const totalPayment = totalDisbursed + totalInterest + totalManagementFees;
+            const requestedAmountFull = Math.round(totalDisbursed * 0.02);
+            const isRequestedUpfront = document.getElementById('is_requested_paid_upfront').checked;
+            
+            const totalPayment = totalDisbursed + totalInterest + totalManagementFees + (isRequestedUpfront ? 0 : requestedAmountFull);
             const monthlyPayment = instalments > 1
-                ? Math.round(totalPayment / instalments)
-                : totalPayment;
+                ? Math.round((totalDisbursed + totalInterest + totalManagementFees) / instalments)
+                : (totalDisbursed + totalInterest + totalManagementFees);
             
             document.getElementById('monthly_payment').value = formatNumber(monthlyPayment);
             document.getElementById('total_interest').value  = formatNumber(totalInterest);
