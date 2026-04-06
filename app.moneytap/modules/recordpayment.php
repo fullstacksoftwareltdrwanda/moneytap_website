@@ -318,6 +318,7 @@ try {
                     $total_mgmt_credited = 0;
                     $total_future_interest_waived = 0;
                     $total_future_mgmt_waived = 0;
+                    $total_req_amount_credited = 0;
 
                     foreach ($prepay_instalment_ids as $idx => $inst_id) {
                         $inst_id = intval($inst_id);
@@ -335,16 +336,19 @@ try {
                             // ── Current instalment: collect everything ──
                             $ir = max(0, floatval($inst_row['interest_amount']) - floatval($inst_row['interest_paid']));
                             $mf = max(0, floatval($inst_row['management_fee']) - floatval($inst_row['management_fee_paid']));
-                            $p = max(0, floatval($inst_row['balance_remaining']) - $ir - $mf);
+                            $ra = max(0, floatval($inst_row['requested_amount']) - floatval($inst_row['requested_amount_paid']));
+                            $p = max(0, floatval($inst_row['balance_remaining']) - $ir - $mf - $ra);
 
                             $principal_paid_now = $p;
                             $interest_paid_now = $ir;
                             $mgmt_paid_now = $mf;
-                            $instalment_paid = $p + $ir + $mf;
+                            $req_paid_now = $ra;
+                            $instalment_paid = $p + $ir + $mf + $req_paid_now;
                             $new_balance = max(0, floatval($inst_row['balance_remaining']) - $instalment_paid);
 
                             $total_interest_credited += $ir;
                             $total_mgmt_credited += $mf;
+                            $total_req_amount_credited += $ra;
 
                         }
                         else {
@@ -352,6 +356,7 @@ try {
                             $principal_paid_now = floatval($prepay_principal_amounts[$idx]);
                             $interest_paid_now = 0;
                             $mgmt_paid_now = 0;
+                            $req_paid_now = 0;
                             $instalment_paid = $principal_paid_now;
                             $new_balance = 0;
 
