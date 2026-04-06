@@ -108,6 +108,8 @@ try {
         principal_paid,
         interest_paid,
         management_fee_paid,
+        requested_amount,
+        requested_amount_paid,
         balance_remaining,
         status,
         days_overdue,
@@ -539,6 +541,7 @@ try {
             $principal_amount = floatval($_POST['principal_amount'] ?? 0);
             $interest_amount = floatval($_POST['interest_amount'] ?? 0);
             $management_fee = floatval($_POST['management_fee'] ?? 0);
+            $requested_amount_to_pay = floatval($_POST['requested_amount_value'] ?? 0);
 
             $days_overdue = intval($_POST['days_overdue'] ?? 0);
             $penalties = floatval($_POST['penalties'] ?? 0);
@@ -563,7 +566,7 @@ try {
                 $conn->begin_transaction();
 
                 try {
-                    $get_instalment_query = "SELECT opening_balance, balance_remaining, total_payment, instalment_number
+                    $get_instalment_query = "SELECT opening_balance, balance_remaining, total_payment, instalment_number, requested_amount, requested_amount_paid
                                             FROM loan_instalments WHERE instalment_id = ?";
                     $get_instalment_stmt = $conn->prepare($get_instalment_query);
                     $get_instalment_stmt->bind_param("i", $instalment_id);
@@ -658,6 +661,9 @@ try {
                     $mgmt_fee_paid = min($management_fee, $remaining_to_allocate);
                     $remaining_to_allocate -= $mgmt_fee_paid;
 
+                    $req_amount_paid_now = min($requested_amount_to_pay, $remaining_to_allocate);
+                    $remaining_to_allocate -= $req_amount_paid_now;
+
                     $principal_paid = min($principal_amount, $remaining_to_allocate);
                     if ($remaining_to_allocate > $principal_amount) {
                         $principal_paid = $remaining_to_allocate;
@@ -726,6 +732,48 @@ try {
                         ]);
                     }
 
+                    if ($req_amount_paid_now > 0) {
+                        // Credit Requested Amount Income (4203)
+                        $req_inc_beg = getBeginningBalance($conn, '4203', $payment_date);
+                        createLedgerEntry($conn, [
+                            'transaction_date' => $payment_date,
+                            'class' => 'Fee Income',
+                            'account_code' => '4203',
+                            'account_name' => 'Requested Amount Income (2%)',
+                            'particular' => 'Requested Amount Fee Payment',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $req_inc_beg,
+                            'debit_amount' => 0,
+                            'credit_amount' => $req_amount_paid_now,
+                            'movement' => $req_amount_paid_now,
+                            'ending_balance' => $req_inc_beg + $req_amount_paid_now,
+                            'reference_type' => 'loan_payment',
+                            'reference_id' => $instalment_id,
+                            'created_by' => $created_by
+                        ]);
+
+                        // Credit Requested Amount Receivable (1202)
+                        $req_rec_beg = getBeginningBalance($conn, '1202', $payment_date);
+                        createLedgerEntry($conn, [
+                            'transaction_date' => $payment_date,
+                            'class' => 'Assets',
+                            'account_code' => '1202',
+                            'account_name' => 'Requested Amount Receivable',
+                            'particular' => 'Requested Amount Receivable Payment',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $req_rec_beg,
+                            'debit_amount' => 0,
+                            'credit_amount' => $req_amount_paid_now,
+                            'movement' => -$req_amount_paid_now,
+                            'ending_balance' => $req_rec_beg - $req_amount_paid_now,
+                            'reference_type' => 'loan_payment',
+                            'reference_id' => $instalment_id,
+                            'created_by' => $created_by
+                        ]);
+                    }
+
 
                     // --- RECORD IN LOAN_PAYMENTS TABLE (Required for History & Deletion) ---
                     $month_paid = date('F Y', strtotime($payment_date));
@@ -785,6 +833,7 @@ try {
                                                 principal_paid       = principal_paid + ?,
                                                 interest_paid        = interest_paid + ?,
                                                 management_fee_paid  = management_fee_paid + ?,
+                                                requested_amount_paid = requested_amount_paid + ?,
                                                 balance_remaining    = ?,
                                                 closing_balance      = ?,
                                                 penalty_paid         = penalty_paid + ?,
@@ -799,6 +848,7 @@ try {
                         $principal_paid,
                         $interest_paid,
                         $mgmt_fee_paid,
+                        $req_amount_paid_now,
                         $new_balance_remaining,
                         $actual_closing_balance_for_row,
                         $penalty_paid,
@@ -1267,6 +1317,7 @@ endif; ?>
                                     <th class="text-end">Principal</th>
                                     <th class="text-end">Interest</th>
                                     <th class="text-end">Management Fee</th>
+                                    <th class="text-end text-primary" style="background:#e7f3ff;">Requested Amt</th>
                                     <th class="text-end">Total Payment</th>
                                     <th class="text-end">Closing Balance</th>
                                 </tr>
@@ -1278,8 +1329,8 @@ endif; ?>
         $due_date = $inst['due_date'];
         $opening_balance = floatval($inst['opening_balance']);
         $principal = floatval($inst['principal_amount']);
-        $interest = floatval($inst['interest_amount']);
         $mgmt_fee = floatval($inst['management_fee']);
+        $req_amount = floatval($inst['requested_amount'] ?? 0);
         $total_payment = floatval($inst['total_payment']);
         $closing_balance = floatval($inst['closing_balance']);
         $paid_amount = floatval($inst['paid_amount']);
@@ -1308,6 +1359,7 @@ endif; ?>
                                     data-principal="<?php echo $principal; ?>"
                                     data-interest="<?php echo $interest; ?>"
                                     data-management-fee="<?php echo $mgmt_fee; ?>"
+                                    data-requested-amount="<?php echo $req_amount; ?>"
                                     data-total-payment="<?php echo $total_payment; ?>"
                                     data-closing-balance="<?php echo $closing_balance; ?>"
                                     data-balance="<?php echo $balance; ?>"
@@ -1323,6 +1375,7 @@ endif; ?>
                                     <td class="text-end"><?php echo number_format($principal, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($interest, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($mgmt_fee, 0); ?></td>
+                                    <td class="text-end fw-bold text-primary" style="background:#e7f3ff;"><?php echo $req_amount > 0 ? number_format($req_amount, 0) : '—'; ?></td>
                                     <td class="text-end"><?php echo number_format($total_payment, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($closing_balance, 0); ?></td>
                                 </tr>
@@ -1336,6 +1389,7 @@ endif; ?>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'principal_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'interest_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'management_fee')), 0); ?></th>
+                                    <th class="text-end text-primary"><?php echo number_format(array_sum(array_column($existing_instalments, 'requested_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'total_payment')), 0); ?></th>
                                     <th class="text-end">-</th>
                                 </tr>
@@ -1397,6 +1451,7 @@ endif; ?>
                     <input type="hidden" id="principal_amount"    name="principal_amount">
                     <input type="hidden" id="interest_amount"     name="interest_amount">
                     <input type="hidden" id="management_fee"      name="management_fee">
+                    <input type="hidden" id="requested_amount_value" name="requested_amount_value">
                     
                     <div class="row">
                         <div class="col-md-6 border-end">
@@ -1428,6 +1483,10 @@ endif; ?>
                                 <!-- ✅ DYNAMIC label rendered from PHP -->
                                 <span>Management Fee (<?php echo htmlspecialchars($mgmt_fee_rate_label); ?>):</span>
                                 <span id="summary_management">0</span>
+                            </div>
+                            <div id="summary_requested_container" class="payment-summary-item text-primary fw-bold" style="background:#e7f3ff; display:none;">
+                                <span>Requested Amount (2%):</span>
+                                <span id="summary_requested">0</span>
                             </div>
                             <div class="payment-summary-item" style="border-top:2px solid #000;background:#e7f3ff;">
                                 <strong>Total Due:</strong>
@@ -1657,6 +1716,7 @@ function openCheckoutModal(row) {
     const principal       = parseFloat(row.dataset.principal)      || 0;
     const interest        = parseFloat(row.dataset.interest)       || 0;
     const managementFee   = parseFloat(row.dataset.managementFee)  || 0;
+    const requestedAmount = parseFloat(row.dataset.requestedAmount) || 0;
     const totalPayment    = parseFloat(row.dataset.totalPayment)   || 0;
     const closingBalance  = parseFloat(row.dataset.closingBalance) || 0;
     const paidAmount      = parseFloat(row.dataset.paidAmount)     || 0;
@@ -1673,6 +1733,7 @@ function openCheckoutModal(row) {
     form.querySelector('#principal_amount').value  = principal;
     form.querySelector('#interest_amount').value   = interest;
     form.querySelector('#management_fee').value    = managementFee;
+    form.querySelector('#requested_amount_value').value = requestedAmount;
 
     document.getElementById('summary_instalment').textContent = '#' + instalmentNumber;
     document.getElementById('summary_due_date').textContent   = formatDate(dueDate);
@@ -1680,6 +1741,14 @@ function openCheckoutModal(row) {
     document.getElementById('summary_principal').textContent  = formatNumber(principal);
     document.getElementById('summary_interest').textContent   = formatNumber(interest);
     document.getElementById('summary_management').textContent = formatNumber(managementFee);
+    
+    if (requestedAmount > 0) {
+        document.getElementById('summary_requested').textContent = formatNumber(requestedAmount);
+        document.getElementById('summary_requested_container').style.display = 'flex';
+    } else {
+        document.getElementById('summary_requested_container').style.display = 'none';
+    }
+
     document.getElementById('summary_total').textContent      = formatNumber(totalPayment);
     document.getElementById('summary_closing').textContent    = formatNumber(closingBalance);
     document.getElementById('summary_paid').textContent       = formatNumber(paidAmount);
