@@ -59,7 +59,8 @@ function convertYMDtoDMY($date) {
 }
 
 function formatMoney($amount, $decimals = 0) {
-    return number_format($amount, $decimals, '.', ',');
+    if ($amount === null) return '0';
+    return number_format((float)$amount, $decimals, '.', ',');
 }
 
 function parseMoney($moneyString) {
@@ -311,7 +312,10 @@ $default_requested_amount = round($default_total_disbursed * ($default_requested
 $default_rate = 5.0;
 $default_instalments = 6;
 
-$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, 0);
+$default_requested_paid = 0;
+$requested_amount_remaining = max(0, $default_requested_amount - $default_requested_paid);
+
+$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_requested_paid);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
 $default_total_management_fees = $schedule_data['total_management_fees'];
@@ -327,6 +331,7 @@ if ($request_data) {
     $default_requested_amount = floatval($request_data['requested_amount']);
     $default_requested_paid = floatval($request_data['requested_amount_paid'] ?? 0);
     $default_is_requested_paid_upfront = (bool)$request_data['is_requested_paid_upfront'];
+    $requested_amount_remaining = max(0, $default_requested_amount - $default_requested_paid);
     
     // Re-calc dependent defaults
     $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
