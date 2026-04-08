@@ -328,6 +328,59 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .animate-in { animation: slideUp 0.4s ease-out; }
 .animate-slide-up { animation: slideUp 0.6s ease-out; }
+
+/* Select2 Custom Styling for Premium Look & Visibility */
+.select2-container--default .select2-selection--single {
+    height: 60px !important;
+    background-color: #fff !important;
+    border: 2px solid #cfe2ff !important;
+    border-radius: 1rem !important;
+    padding: 12px !important;
+    transition: all 0.2s;
+}
+/* FORCE BLACK TEXT ON ALL ELEMENTS for visibility */
+#loanRequestForm input, 
+#loanRequestForm select, 
+#loanRequestForm .form-control,
+#loanRequestForm .form-select,
+#loanRequestForm .fw-bold, 
+#loanRequestForm .fw-black,
+#loanRequestForm .text-dark,
+.select2-selection__rendered,
+.select2-results__option {
+    color: #000 !important;
+}
+
+/* Select2 Custom Styling for Premium Look & Visibility */
+.select2-container--default .select2-selection--single {
+    height: 60px !important;
+    background-color: #fff !important;
+    border: 2px solid #cfe2ff !important;
+    border-radius: 1rem !important;
+    padding: 12px !important;
+    transition: all 0.2s;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    font-weight: 700 !important;
+    line-height: normal !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 58px !important;
+}
+.select2-dropdown {
+    border-radius: 1rem !important;
+    border: 2px solid #cfe2ff !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+    overflow: hidden;
+}
+.select2-results__option {
+    padding: 12px 20px !important;
+    font-weight: 500 !important;
+}
+.select2-results__option--highlighted[aria-selected] {
+    background-color: #0d6efd !important;
+    color: #fff !important; /* White text looks better when highlighted */
+}
 </style>
 
 <script>
