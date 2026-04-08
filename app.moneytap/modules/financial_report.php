@@ -522,19 +522,18 @@ switch ($report_type) {
              JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
              WHERE lp2.customer_id = c.customer_id AND li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59') as pen_pd,
             
-            -- Requested Amount Income (Upfront + Installment Paid)
+            -- Requested Amount Income (Upfront from Request + Upfront from Portfolio + Installment Paid)
             (
-                COALESCE((SELECT SUM(lp2.requested_amount) 
+                COALESCE((SELECT SUM(lp2.requested_amount_paid_upfront) 
                  FROM loan_portfolio lp2 
                  WHERE lp2.customer_id = c.customer_id 
-                   AND lp2.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' 
-                   AND lp2.is_requested_paid_upfront = 1), 0)
+                   AND lp2.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date'), 0)
                 +
-                COALESCE((SELECT SUM(lr.requested_amount) 
+                COALESCE((SELECT SUM(lr.requested_amount_paid) 
                  FROM loan_requests lr 
                  WHERE lr.customer_id = c.customer_id 
                    AND lr.created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' 
-                   AND lr.is_requested_paid_upfront = 1 AND lr.status != 'Disbursed'), 0)
+                   AND lr.status != 'Disbursed'), 0)
                 +
                 COALESCE((SELECT SUM(li.requested_amount_paid) 
                  FROM loan_instalments li 
