@@ -194,24 +194,32 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                                 <span class="text-primary small">Locked for security</span>
                             </label>
                             <?php if ($customer_id > 0): ?>
-                                <div class="p-3 bg-light rounded-4 border-dashed d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-sm bg-primary text-white me-3"><?php echo strtoupper(substr($customer_name, 0, 1)); ?></div>
-                                        <div>
-                                            <div class="fw-bold"><?php echo htmlspecialchars($customer_name); ?></div>
-                                            <div class="text-muted x-small">ID #<?php echo $customer_id; ?></div>
-                                        </div>
+                            <!-- Pre-selected Customer View -->
+                            <div class="p-3 bg-light rounded-4 border-dashed d-flex align-items-center justify-content-between" style="color: #000 !important;">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary text-white me-3"><?php echo strtoupper(substr($customer_name, 0, 1) ?: 'C'); ?></div>
+                                    <div>
+                                        <div class="fw-bold fs-5" style="color: #000 !important;"><?php echo htmlspecialchars($customer_name); ?></div>
+                                        <div class="text-muted x-small">ID #<?php echo $customer_id; ?></div>
                                     </div>
-                                    <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
-                                    <span class="badge bg-success-soft text-success px-3">VERIFIED</span>
                                 </div>
+                                <a href="?page=add_loan_request" class="btn btn-sm btn-outline-secondary rounded-pill">Change</a>
+                            </div>
+                            <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
                             <?php else: ?>
-                                <select name="customer_id" class="form-select rounded-4 py-3 shadow-none border-2 border-primary-soft select2-active">
-                                    <option value="">-- Choose Member --</option>
-                                    <?php while($m = $members->fetch_assoc()): ?>
-                                        <option value="<?php echo $m['customer_id']; ?>"><?php echo htmlspecialchars($m['customer_name'] . ' ('.$m['customer_code'].')'); ?></option>
-                                    <?php endwhile; ?>
-                                </select>
+                            <!-- Searchable Dropdown if no CID -->
+                            <select name="customer_id" class="form-select rounded-4 py-3 shadow-none border-2 border-primary-soft select2-active" style="color: #000 !important; font-weight: 700 !important;" required>
+                                <option value="" style="color: #000 !important;">Choose a member to study...</option>
+                                <?php 
+                                $cust_sql = "SELECT customer_id, customer_name, customer_code FROM customers WHERE status = 'Approved' ORDER BY customer_name";
+                                $cust_res = $conn->query($cust_sql);
+                                while ($c = $cust_res->fetch_assoc()):
+                                ?>
+                                    <option value="<?php echo $c['customer_id']; ?>" style="color: #000 !important;">
+                                        <?php echo htmlspecialchars($c['customer_name']) . " (" . $c['customer_code'] . ")"; ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
                             <?php endif; ?>
                         </div>
 
