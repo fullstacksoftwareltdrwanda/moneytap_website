@@ -428,7 +428,7 @@ function executeApproval($conn, $approval) {
             }
 
             require_once __DIR__ . '/activity_logger.php';
-            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($is_paid_upfront ? "PAID" : "ADDED TO INSTALLMENT"));
+            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($is_paid_fully ? "PAID" : "ADDED TO INSTALLMENT"));
             break;
         }
 
