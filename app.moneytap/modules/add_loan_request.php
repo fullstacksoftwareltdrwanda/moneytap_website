@@ -337,6 +337,10 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 .animate-in { animation: slideUp 0.4s ease-out; }
 .animate-slide-up { animation: slideUp 0.6s ease-out; }
 
+:root {
+    color-scheme: light !important;
+}
+
 /* Select2 Custom Styling for Premium Look & Visibility */
 .select2-container--default .select2-selection--single {
     height: 60px !important;
@@ -355,19 +359,21 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 #loanRequestForm .text-dark,
 #loanRequestForm .form-control,
 #loanRequestForm .form-select,
+#loanRequestForm select,
+#loanRequestForm option,
 .select2-selection__rendered,
 .select2-results__option,
 .select2-search__field {
-    color: #000 !important;
-    -webkit-text-fill-color: #000 !important; /* Some browsers need this */
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
 }
 
 #loanRequestForm .text-muted {
-    color: #666 !important;
+    color: #444444 !important;
 }
 
 #loanRequestForm .avatar-sm {
-    color: #fff !important; /* Keep avatar letter white */
+    color: #ffffff !important;
 }
 
 /* Select2 Specifics */
@@ -457,4 +463,22 @@ document.getElementById('loan_amount').addEventListener('input', function (e) {
     let diff = this.value.length - oldVal.length;
     this.setSelectionRange(cursor + diff, cursor + diff);
 });
+
+// Failsafe for visibility in Edge/Chrome with Dark Mode extensions
+setInterval(() => {
+    const selectors = [
+        '#loanRequestForm select', 
+        '#loanRequestForm .form-select',
+        '#loanRequestForm label', 
+        '#loanRequestForm .fw-bold',
+        '.select2-selection__rendered',
+        '.select2-results__option'
+    ];
+    selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            el.style.color = '#000000';
+            el.style.setProperty('color', '#000000', 'important');
+        });
+    });
+}, 500);
 </script>
