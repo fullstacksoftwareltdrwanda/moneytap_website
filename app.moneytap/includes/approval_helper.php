@@ -384,47 +384,75 @@ function executeApproval($conn, $approval) {
                     }
                 }
 
-                    if ($requested_rem > 0) {
-                        // Recognize REMAINING income (that wasn't recorded in the Request phase)
+                if (!$already_recorded) {
+                    if ($requested_amount > 0) {
+                        // 1. Recognize TOTAL income (4203)
                         $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
                         _helper_createLedgerEntry($conn, [
                             'transaction_date' => $p_date,
                             'class' => 'Revenue',
                             'account_code' => '4203',
                             'account_name' => 'Requested Amount Income (2%)',
-                            'particular' => 'Remaining Processing Fee Income',
+                            'particular' => 'Processing Fee Income (Initial Recognition)',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
                             'beginning_balance' => $r_inc_beg,
                             'debit_amount' => 0,
-                            'credit_amount' => $requested_rem,
-                            'movement' => $requested_rem,
-                            'ending_balance' => $r_inc_beg + $requested_rem,
+                            'credit_amount' => $requested_amount,
+                            'movement' => $requested_amount,
+                            'ending_balance' => $r_inc_beg + $requested_amount,
                             'reference_type' => 'loan_disbursement',
                             'reference_id' => $new_loan_id,
                             'created_by' => 1
                         ]);
 
-                        // Debit Receivable (1202) for the REMAINING part
-                        $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
-                        _helper_createLedgerEntry($conn, [
-                            'transaction_date' => $p_date,
-                            'class' => 'Assets',
-                            'account_code' => '1202',
-                            'account_name' => 'Requested Amount Receivable',
-                            'particular' => 'Accrued Processing Fee (Remaining)',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $rec_beg,
-                            'debit_amount' => $requested_rem,
-                            'credit_amount' => 0,
-                            'movement' => $requested_rem,
-                            'ending_balance' => $rec_beg + $requested_rem,
-                            'reference_type' => 'loan_disbursement',
-                            'reference_id' => $new_loan_id,
-                            'created_by' => 1
-                        ]);
+                        // 2. Debit Cash (1101) for the part paid upfront
+                        if ($requested_paid > 0) {
+                            $c_beg_up = _helper_getBeginningBalance($conn, '1101', $p_date);
+                            _helper_createLedgerEntry($conn, [
+                                'transaction_date' => $p_date,
+                                'class' => 'Assets',
+                                'account_code' => '1101',
+                                'account_name' => 'Cash on Hand',
+                                'particular' => 'Processing Fee (Already Paid)',
+                                'voucher_number' => $voucher_number,
+                                'narration' => $narration,
+                                'beginning_balance' => $c_beg_up,
+                                'debit_amount' => $requested_paid,
+                                'credit_amount' => 0,
+                                'movement' => $requested_paid,
+                                'ending_balance' => $c_beg_up + $requested_paid,
+                                'reference_type' => 'loan_disbursement',
+                                'reference_id' => $new_loan_id,
+                                'created_by' => 1
+                            ]);
+                        }
+
+                        // 3. Debit Receivable (1202) for the portion remaining
+                        if ($requested_rem > 0) {
+                            $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
+                            _helper_createLedgerEntry($conn, [
+                                'transaction_date' => $p_date,
+                                'class' => 'Assets',
+                                'account_code' => '1202',
+                                'account_name' => 'Requested Amount Receivable',
+                                'particular' => 'Accrued Processing Fee (Remaining)',
+                                'voucher_number' => $voucher_number,
+                                'narration' => $narration,
+                                'beginning_balance' => $rec_beg,
+                                'debit_amount' => $requested_rem,
+                                'credit_amount' => 0,
+                                'movement' => $requested_rem,
+                                'ending_balance' => $rec_beg + $requested_rem,
+                                'reference_type' => 'loan_disbursement',
+                                'reference_id' => $new_loan_id,
+                                'created_by' => 1
+                            ]);
+                        }
                     }
+                } else {
+                    error_log("Processing fee for request #$rid already recorded. Skipping duplicated disbursement entries.");
+                }
             }
 
             require_once __DIR__ . '/activity_logger.php';

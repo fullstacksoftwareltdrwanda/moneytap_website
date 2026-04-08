@@ -4,6 +4,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $conn = getConnection();
+if (!$conn) die("Database connection failed");
+
+// Safety Migration: Add missing columns if they don't exist
+$conn->query("ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS requested_amount_paid DECIMAL(15, 2) DEFAULT 0.00");
+$conn->query("ALTER TABLE loan_portfolio ADD COLUMN IF NOT EXISTS requested_amount_paid_upfront DECIMAL(15, 2) DEFAULT 0.00");
 
 // Get report type
 $report_type = isset($_GET['type']) ? $_GET['type'] : 'trial_balance';
