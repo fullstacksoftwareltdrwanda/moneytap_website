@@ -117,16 +117,26 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
                 $period_credit = roundAmount(floatval(mysqli_fetch_assoc($res_move_c)['mc'] ?? 0));
             } elseif ($account_code === '1202') {
                 // Requested Amount Receivable (1202)
-                $res_open = mysqli_query($conn, "SELECT SUM(requested_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND is_requested_paid_upfront = 0");
-                $total_req_before = floatval(mysqli_fetch_assoc($res_open)['op'] ?? 0);
+                // Opening: disbursed loans before period where fee not fully paid
+                $res_open_lp = mysqli_query($conn, "SELECT SUM(requested_amount - IFNULL(requested_amount_paid_upfront,0)) as op FROM loan_portfolio WHERE disbursement_date < '$start_date' AND is_requested_paid_upfront = 0");
+                $lp_open = floatval(mysqli_fetch_assoc($res_open_lp)['op'] ?? 0);
+                // Plus pending requests before period where fee not fully paid
+                $res_open_req = mysqli_query($conn, "SELECT SUM(requested_amount - IFNULL(requested_amount_paid,0)) as op FROM loan_requests WHERE created_at < '$start_date 00:00:00' AND is_requested_paid_upfront = 0 AND status != 'Disbursed'");
+                $req_open = floatval(mysqli_fetch_assoc($res_open_req)['op'] ?? 0);
                 $res_rep_before = mysqli_query($conn, "SELECT SUM(requested_amount_paid) as rp FROM loan_instalments WHERE payment_date < '$start_date 00:00:00'");
                 $total_paid_before = floatval(mysqli_fetch_assoc($res_rep_before)['rp'] ?? 0);
-                $initial_balance = roundAmount($total_req_before - $total_paid_before);
+                $initial_balance = roundAmount($lp_open + $req_open - $total_paid_before);
 
-                $res_move_d = mysqli_query($conn, "SELECT SUM(requested_amount) as md FROM loan_portfolio WHERE disbursement_date BETWEEN '$start_date' AND '$end_date' AND is_requested_paid_upfront = 0");
-                $period_debit = roundAmount(floatval(mysqli_fetch_assoc($res_move_d)['md'] ?? 0));
+                // Period movements: new receivables from disbursed loans in period
+                $res_move_lp = mysqli_query($conn, "SELECT SUM(requested_amount - IFNULL(requested_amount_paid_upfront,0)) as md FROM loan_portfolio WHERE disbursement_date BETWEEN '$start_date' AND '$end_date' AND is_requested_paid_upfront = 0");
+                $period_debit = roundAmount(floatval(mysqli_fetch_assoc($res_move_lp)['md'] ?? 0));
+                // Plus from pending requests in period
+                $res_move_req = mysqli_query($conn, "SELECT SUM(requested_amount - IFNULL(requested_amount_paid,0)) as md FROM loan_requests WHERE created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND is_requested_paid_upfront = 0 AND status != 'Disbursed'");
+                $period_debit += roundAmount(floatval(mysqli_fetch_assoc($res_move_req)['md'] ?? 0));
+                // Credits = installment collections in period
                 $res_move_c = mysqli_query($conn, "SELECT SUM(requested_amount_paid) as mc FROM loan_instalments WHERE payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date'");
                 $period_credit = roundAmount(floatval(mysqli_fetch_assoc($res_move_c)['mc'] ?? 0));
+
             } elseif ($account_code === '4202') {
                 // Disbursement Fee
                 $res_open = mysqli_query($conn, "SELECT SUM(management_fee_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
@@ -134,31 +144,30 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
                 $res_move = mysqli_query($conn, "SELECT SUM(management_fee_amount) as mp FROM loan_portfolio lp WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
                 $period_credit = roundAmount(floatval(mysqli_fetch_assoc($res_move)['mp'] ?? 0));
             } elseif ($account_code === '4203') {
-                // Requested Amount Income (Accrual/Upfront from Portfolio + Requests, Cash for instalments)
-                // 1. Upfront part (from Portfolio AND pending Requests)
-                $res_upfront_open = mysqli_query($conn, "SELECT SUM(requested_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND is_requested_paid_upfront = 1");
-                $upfront_open = floatval(mysqli_fetch_assoc($res_upfront_open)['op'] ?? 0);
+                // Requested Amount Income (4203)
+                // Sums ALL fee income: partial upfront payments from requests + installment payments
                 
-                // Add from Requests (those paid upfront but not yet disbursed)
-                $res_req_open = mysqli_query($conn, "SELECT SUM(requested_amount) as op FROM loan_requests WHERE created_at < '$start_date' AND is_requested_paid_upfront = 1 AND status != 'Disbursed'");
-                $upfront_open += floatval(mysqli_fetch_assoc($res_req_open)['op'] ?? 0);
-
-                $res_upfront_move = mysqli_query($conn, "SELECT SUM(requested_amount) as mp FROM loan_portfolio lp WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND is_requested_paid_upfront = 1");
-                $upfront_move = floatval(mysqli_fetch_assoc($res_upfront_move)['mp'] ?? 0);
-                
-                // Add from Requests move
-                $res_req_move = mysqli_query($conn, "SELECT SUM(requested_amount) as mp FROM loan_requests WHERE created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' AND is_requested_paid_upfront = 1 AND status != 'Disbursed'");
-                $upfront_move += floatval(mysqli_fetch_assoc($res_req_move)['mp'] ?? 0);
-
-                // 2. Instalment part (from Instalments - Cash basis)
+                // Opening (before period): partial upfront paid from loan_requests
+                $res_req_open_paid = mysqli_query($conn, "SELECT SUM(IFNULL(requested_amount_paid,0)) as op FROM loan_requests WHERE created_at < '$start_date 00:00:00'");
+                $req_paid_open = floatval(mysqli_fetch_assoc($res_req_open_paid)['op'] ?? 0);
+                // Plus fully-paid disbursed portfolio loans (upfront paid at disbursement, no request stage)
+                $res_lp_open_paid = mysqli_query($conn, "SELECT SUM(IFNULL(requested_amount_paid_upfront,0)) as op FROM loan_portfolio WHERE disbursement_date < '$start_date' AND (requested_amount_paid_upfront > 0)");
+                $lp_paid_open = floatval(mysqli_fetch_assoc($res_lp_open_paid)['op'] ?? 0);
+                // Plus installment collections before period
                 $res_inst_open = mysqli_query($conn, "SELECT SUM(requested_amount_paid) as op FROM loan_instalments WHERE payment_date < '$start_date 00:00:00'");
                 $inst_open = floatval(mysqli_fetch_assoc($res_inst_open)['op'] ?? 0);
-                
-                $res_inst_move = mysqli_query($conn, "SELECT SUM(requested_amount_paid) as mp FROM loan_instalments WHERE payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59'");
-                $inst_move = floatval(mysqli_fetch_assoc($res_inst_move)['mp'] ?? 0);
+                $initial_balance = -roundAmount($req_paid_open + $lp_paid_open + $inst_open);
 
-                $initial_balance = -roundAmount($upfront_open + $inst_open);
-                $period_credit = roundAmount($upfront_move + $inst_move);
+                // Period movements: partial upfront paid from loan_requests in period
+                $res_req_move_paid = mysqli_query($conn, "SELECT SUM(IFNULL(requested_amount_paid,0)) as mp FROM loan_requests WHERE created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date'");
+                $req_paid_move = floatval(mysqli_fetch_assoc($res_req_move_paid)['mp'] ?? 0);
+                // Plus from disbursed portfolio (upfront paid, no prior request)
+                $res_lp_move_paid = mysqli_query($conn, "SELECT SUM(IFNULL(requested_amount_paid_upfront,0)) as mp FROM loan_portfolio WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND (requested_amount_paid_upfront > 0)");
+                $lp_paid_move = floatval(mysqli_fetch_assoc($res_lp_move_paid)['mp'] ?? 0);
+                // Plus installment collections in period
+                $res_inst_move = mysqli_query($conn, "SELECT SUM(requested_amount_paid) as mp FROM loan_instalments WHERE payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date'");
+                $inst_move = floatval(mysqli_fetch_assoc($res_inst_move)['mp'] ?? 0);
+                $period_credit = roundAmount($req_paid_move + $lp_paid_move + $inst_move);
             } elseif (in_array($account_code, ['4101', '4201', '4205'])) {
                 // Accounts from loan_instalments table
                 $exp_col = ''; $paid_col = '';

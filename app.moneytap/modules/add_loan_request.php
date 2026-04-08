@@ -142,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
 
                 // 3. Debit Receivable (1202) for the part remaining
                 $req_rem = $req_amt - $req_paid;
+                error_log("DEBUG REQ: amt=$req_amt, paid=$req_paid, rem=$req_rem");
                 if ($req_rem > 0) {
                     $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
                     _helper_createLedgerEntry($conn, [
