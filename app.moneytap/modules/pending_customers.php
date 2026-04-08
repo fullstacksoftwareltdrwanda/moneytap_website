@@ -68,8 +68,8 @@ if (!empty($params)) {
 
 <div class="row mb-4">
     <div class="col-12 py-3">
-        <h2 class="h4 fw-bold text-primary"><i class="bi bi-hourglass-split me-2"></i> Requested Loans</h2>
-        <p class="text-muted small">Manage applications and document resubmissions.</p>
+        <h2 class="h4 fw-bold text-primary"><i class="bi bi-people-fill me-2"></i> Pending Member Onboarding</h2>
+        <p class="text-muted small">Approve new members and manage document resubmissions before they can request loans.</p>
     </div>
 </div>
 

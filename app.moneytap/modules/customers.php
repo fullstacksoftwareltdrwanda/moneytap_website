@@ -250,6 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_customer_id'])
                                     </td>
                                     <td class="text-center pe-4">
                                         <div class="btn-group btn-group-sm">
+                                            <a href="?page=add_loan_request&cid=<?php echo $customer['customer_id']; ?>" class="btn btn-outline-success" title="New Loan Request"><i class="bi bi-file-earmark-plus"></i></a>
                                             <a href="?page=view_customer&id=<?php echo $customer['customer_id']; ?>" class="btn btn-outline-primary" title="View Profile"><i class="bi bi-eye"></i></a>
                                             <a href="?page=edit_customer&id=<?php echo $customer['customer_id']; ?>" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
                                             <button type="button" class="btn btn-outline-danger" onclick="confirmDelete(<?php echo $customer['customer_id']; ?>, '<?php echo addslashes($customer['customer_name']); ?>')"><i class="bi bi-trash"></i></button>

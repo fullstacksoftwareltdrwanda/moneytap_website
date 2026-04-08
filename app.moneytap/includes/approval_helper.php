@@ -99,14 +99,15 @@ function executeApproval($conn, $approval) {
                 has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
                 collateral_type, collateral_sub_type, upi_location, square_mtrs,
                 doc_loan_clearance, doc_power_of_attorney, doc_guarantor_letter,
+                requested_amount, loan_duration,
                 created_at, updated_at, is_active, status
             ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
             )";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
             $d = $data;
-            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssss',
+            $stmt->bind_param('ssssssssssssssssssssssssssssssssssssssss',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['record_date'], $d['phone'], $d['email'], $d['organization'],
@@ -117,7 +118,8 @@ function executeApproval($conn, $approval) {
                 $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
                 $d['guarantor_phone'], $d['guarantor_occupation'],
                 $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
-                $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter']
+                $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter'],
+                $d['requested_amount'], $d['loan_duration']
             );
             if (!$stmt->execute()) throw new Exception($stmt->error);
             
@@ -140,11 +142,12 @@ function executeApproval($conn, $approval) {
                 location=?, project=?, project_location=?, caution_location=?,
                 email=?, organization=?, status='Approved', is_active=1, 
                 collateral_type=?, collateral_sub_type=?, upi_location=?, square_mtrs=?,
+                requested_amount=?, loan_duration=?,
                 updated_at=NOW()
                 WHERE customer_id=?";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
-            $stmt->bind_param('ssssssssssssssssssssssssssi',
+            $stmt->bind_param('ssssssssssssssssssssssssssssi',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['phone'], $d['father_name'], $d['mother_name'], $d['spouse'],
@@ -152,6 +155,7 @@ function executeApproval($conn, $approval) {
                 $d['location'], $d['project'], $d['project_location'], $d['caution_location'],
                 $d['email'], $d['organization'],
                 $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
+                $d['requested_amount'], $d['loan_duration'],
                 $entity_id
             );
             if (!$stmt->execute()) throw new Exception($stmt->error);
@@ -246,7 +250,7 @@ function executeApproval($conn, $approval) {
                 $requested_amount, $is_paid_upfront, '$requested_status'
             )";
             
-            if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error);
+            if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error . " | SQL: " . $sql);
             $new_loan_id = $conn->insert_id;
 
             // Update customer
@@ -273,6 +277,179 @@ function executeApproval($conn, $approval) {
                 $conn, $new_loan_id, $d['loan_number'], 'Disbursement',
                 $d['disbursement_date'], $d['total_disbursed'], "Loan disbursement", 1
             );
+
+            // --- ACCOUNTING LEDGER ENTRIES ---
+            $voucher_number = $d['loan_number'];
+            $narration = "Loan Disbursement - " . $d['loan_number'];
+            $p_date = $d['disbursement_date'];
+            
+            // 1. Debit Loans to Customers (1201)
+            $l_beg = _helper_getBeginningBalance($conn, '1201', $p_date);
+            _helper_createLedgerEntry($conn, [
+                'transaction_date' => $p_date,
+                'class' => 'Assets',
+                'account_code' => '1201',
+                'account_name' => 'Loans to Customers',
+                'particular' => 'Loan Portfolio Addition',
+                'voucher_number' => $voucher_number,
+                'narration' => $narration,
+                'beginning_balance' => $l_beg,
+                'debit_amount' => $d['total_disbursed'],
+                'credit_amount' => 0,
+                'movement' => $d['total_disbursed'],
+                'ending_balance' => $l_beg + $d['total_disbursed'],
+                'reference_type' => 'loan_disbursement',
+                'reference_id' => $new_loan_id,
+                'created_by' => 1
+            ]);
+
+            // 2. Credit Cash/Bank (Check which one was used)
+            $cash_amt = floatval($d['cash_amount'] ?? 0);
+            $bank_amt = floatval($d['bank_amount'] ?? 0);
+            
+            if ($cash_amt > 0) {
+                $c_beg = _helper_getBeginningBalance($conn, '1101', $p_date);
+                _helper_createLedgerEntry($conn, [
+                    'transaction_date' => $p_date,
+                    'class' => 'Assets',
+                    'account_code' => '1101',
+                    'account_name' => 'Cash on Hand',
+                    'particular' => 'Disbursement Payment',
+                    'voucher_number' => $voucher_number,
+                    'narration' => $narration,
+                    'beginning_balance' => $c_beg,
+                    'debit_amount' => 0,
+                    'credit_amount' => $cash_amt,
+                    'movement' => -$cash_amt,
+                    'ending_balance' => $c_beg - $cash_amt,
+                    'reference_type' => 'loan_disbursement',
+                    'reference_id' => $new_loan_id,
+                    'created_by' => 1
+                ]);
+            }
+            if ($bank_amt > 0) {
+                $b_beg = _helper_getBeginningBalance($conn, '1102', $p_date);
+                _helper_createLedgerEntry($conn, [
+                    'transaction_date' => $p_date,
+                    'class' => 'Assets',
+                    'account_code' => '1102',
+                    'account_name' => 'Bank Account',
+                    'particular' => 'Disbursement Payment',
+                    'voucher_number' => $voucher_number,
+                    'narration' => $narration,
+                    'beginning_balance' => $b_beg,
+                    'debit_amount' => 0,
+                    'credit_amount' => $bank_amt,
+                    'movement' => -$bank_amt,
+                    'ending_balance' => $b_beg - $bank_amt,
+                    'reference_type' => 'loan_disbursement',
+                    'reference_id' => $new_loan_id,
+                    'created_by' => 1
+                ]);
+            }
+
+            // 3. Credit Management Fee Income (4201) if deducted
+            if ($d['deduct_fee_from_disbursed']) {
+                $m_beg = _helper_getBeginningBalance($conn, '4201', $p_date);
+                _helper_createLedgerEntry($conn, [
+                    'transaction_date' => $p_date,
+                    'class' => 'Revenue',
+                    'account_code' => '4201',
+                    'account_name' => 'Management Fee Income',
+                    'particular' => 'Upfront Management Fee',
+                    'voucher_number' => $voucher_number,
+                    'narration' => $narration,
+                    'beginning_balance' => $m_beg,
+                    'debit_amount' => 0,
+                    'credit_amount' => $d['management_fee'],
+                    'movement' => $d['management_fee'],
+                    'ending_balance' => $m_beg + $d['management_fee'],
+                    'reference_type' => 'loan_disbursement',
+                    'reference_id' => $new_loan_id,
+                    'created_by' => 1
+                ]);
+            }
+
+            // 4. Requested Amount (2%) Accounting
+            if ($requested_amount > 0) {
+                // Check if already recorded during Request phase
+                $already_recorded = false;
+                $rid = intval($d['request_id'] ?? 0);
+                if ($rid > 0) {
+                    $check_sql = "SELECT ledger_id FROM ledger WHERE reference_type='loan_request_fee' AND reference_id = $rid";
+                    $res_check = $conn->query($check_sql);
+                    if ($res_check && $res_check->num_rows > 0) {
+                        $already_recorded = true;
+                    }
+                }
+
+                if (!$already_recorded) {
+                    // Always recognize income
+                    $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
+                    _helper_createLedgerEntry($conn, [
+                        'transaction_date' => $p_date,
+                        'class' => 'Revenue',
+                        'account_code' => '4203',
+                        'account_name' => 'Requested Amount Income (2%)',
+                        'particular' => 'Processing Fee Income',
+                        'voucher_number' => $voucher_number,
+                        'narration' => $narration,
+                        'beginning_balance' => $r_inc_beg,
+                        'debit_amount' => 0,
+                        'credit_amount' => $requested_amount,
+                        'movement' => $requested_amount,
+                        'ending_balance' => $r_inc_beg + $requested_amount,
+                        'reference_type' => 'loan_disbursement',
+                        'reference_id' => $new_loan_id,
+                        'created_by' => 1
+                    ]);
+
+                    if ($is_paid_upfront) {
+                        // Debit Cash (assuming it was paid in cash/bank upfront)
+                        $c_code = ($bank_amt > 0) ? '1102' : '1101';
+                        $c_name = ($c_code === '1102') ? 'Bank Account' : 'Cash on Hand';
+                        $c_beg_up = _helper_getBeginningBalance($conn, $c_code, $p_date);
+                        _helper_createLedgerEntry($conn, [
+                            'transaction_date' => $p_date,
+                            'class' => 'Assets',
+                            'account_code' => $c_code,
+                            'account_name' => $c_name,
+                            'particular' => 'Processing Fee Received Upfront',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $c_beg_up,
+                            'debit_amount' => $requested_amount,
+                            'credit_amount' => 0,
+                            'movement' => $requested_amount,
+                            'ending_balance' => $c_beg_up + $requested_amount,
+                            'reference_type' => 'loan_disbursement',
+                            'reference_id' => $new_loan_id,
+                            'created_by' => 1
+                        ]);
+                    } else {
+                        // Debit Receivable (1202)
+                        $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
+                        _helper_createLedgerEntry($conn, [
+                            'transaction_date' => $p_date,
+                            'class' => 'Assets',
+                            'account_code' => '1202',
+                            'account_name' => 'Requested Amount Receivable',
+                            'particular' => 'Accrued Processing Fee',
+                            'voucher_number' => $voucher_number,
+                            'narration' => $narration,
+                            'beginning_balance' => $rec_beg,
+                            'debit_amount' => $requested_amount,
+                            'credit_amount' => 0,
+                            'movement' => $requested_amount,
+                            'ending_balance' => $rec_beg + $requested_amount,
+                            'reference_type' => 'loan_disbursement',
+                            'reference_id' => $new_loan_id,
+                            'created_by' => 1
+                        ]);
+                    }
+                }
+            }
+
             require_once __DIR__ . '/activity_logger.php';
             logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($is_paid_upfront ? "PAID" : "ADDED TO INSTALLMENT"));
             break;
@@ -473,7 +650,7 @@ if (!function_exists('_helper_PPMT')) {
                 continue;
             }
 
-            $conn->query("INSERT INTO loan_instalments (
+            $sql = "INSERT INTO loan_instalments (
                 loan_id, loan_number, instalment_number, due_date, opening_balance,
                 principal_amount, interest_amount, management_fee, requested_amount, total_payment, closing_balance,
                 paid_amount, principal_paid, interest_paid, management_fee_paid,
@@ -482,7 +659,11 @@ if (!function_exists('_helper_PPMT')) {
                 ".intval($loan_id).", '".$conn->real_escape_string($loan_number)."', $i_num, '$due_date', ".floatval($inst['opening_balance']).",
                 ".floatval($inst['principal']).", ".floatval($inst['interest']).", ".floatval($inst['management_fee']).", ".floatval($inst['requested_amount'] ?? 0).", ".floatval($inst['total_payment']).", ".floatval($inst['closing_balance']).",
                 0, 0, 0, 0, ".floatval($inst['total_payment']).", 'Pending', 0, 0, ".intval($user_id).", NOW()
-            )");
+            )";
+
+            if (!$conn->query($sql)) {
+                throw new Exception("Create installment failed: " . $conn->error . " | SQL: " . $sql);
+            }
         }
     }
     function _helper_createTransactionRecord($conn, $loan_id, $loan_number, $type, $date, $amount, $description, $user_id) {
@@ -492,5 +673,58 @@ if (!function_exists('_helper_PPMT')) {
             ".intval($loan_id).", '".$conn->real_escape_string($loan_number)."', '".$conn->real_escape_string($type)."', '".$conn->real_escape_string($date)."',
             ".floatval($amount).", '".$conn->real_escape_string($description)."', ".intval($user_id).", NOW()
         )");
+    }
+
+    function _helper_getBeginningBalance($conn, $account_code, $date) {
+        $query = "SELECT ending_balance FROM ledger 
+                WHERE account_code = ? 
+                AND transaction_date <= ?
+                ORDER BY transaction_date DESC, ledger_id DESC 
+                LIMIT 1";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("ss", $account_code, $date);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return floatval($row['ending_balance']);
+        }
+        return 0.00;
+    }
+
+    function _helper_createLedgerEntry($conn, $data) {
+        $sql = "INSERT INTO ledger (
+            transaction_date, class, account_code, account_name, particular,
+            voucher_number, narration, beginning_balance, debit_amount, credit_amount, 
+            movement, ending_balance, reference_type, reference_id, created_by, 
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssssddddssii",
+            $data['transaction_date'],
+            $data['class'],
+            $data['account_code'],
+            $data['account_name'],
+            $data['particular'],
+            $data['voucher_number'],
+            $data['narration'],
+            $data['beginning_balance'],
+            $data['debit_amount'],
+            $data['credit_amount'],
+            $data['movement'],
+            $data['ending_balance'],
+            $data['reference_type'],
+            $data['reference_id'],
+            $data['created_by']
+        );
+
+        if (!$stmt->execute()) {
+            error_log("Failed to create ledger entry: " . $stmt->error);
+            return false;
+        }
+        $stmt->close();
+        return true;
     }
 }

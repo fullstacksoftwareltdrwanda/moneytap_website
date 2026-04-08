@@ -196,12 +196,33 @@ endif; ?>
     }
 ?>
             <li class="nav-item">
+                <a class="nav-link <?php echo $current_page == 'loan_requests' ? 'active' : ''; ?>" href="?page=loan_requests">
+                    <i class="bi bi-file-earmark-plus me-2"></i> Loan Requests
+                    <?php 
+                        try {
+                            $req_conn = getConnection();
+                            if($req_conn) {
+                                // Safe check if table exists
+                                $table_exists = $req_conn->query("SHOW TABLES LIKE 'loan_requests'");
+                                if ($table_exists && $table_exists->num_rows > 0) {
+                                    $r_res = $req_conn->query("SELECT COUNT(*) as total FROM loan_requests WHERE status = 'Pending'");
+                                    if ($r_res) {
+                                        $r_count = $r_res->fetch_assoc()['total'];
+                                        if($r_count > 0) echo '<span class="badge bg-info rounded-pill float-end">'.$r_count.'</span>';
+                                    }
+                                }
+                                $req_conn->close();
+                            }
+                        } catch (Throwable $e) { /* Silent fail for any error */ }
+                    ?>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?php echo $current_page == 'pending_customers' ? 'active' : ''; ?>" href="?page=pending_customers">
-                    <i class="bi bi-clock-history me-2"></i> Requested Loans
+                    <i class="bi bi-clock-history me-2"></i> Pending Members
                     <?php if ($pending_count > 0): ?>
-                        <span class="badge bg-danger rounded-pill float-end"><?php echo $pending_count; ?></span>
-                    <?php
-    endif; ?>
+                        <span class="badge bg-warning text-dark rounded-pill float-end"><?php echo $pending_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">

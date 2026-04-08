@@ -90,9 +90,14 @@ $resubbed = !empty($customer['resubmitted_fields']) ? explode(',', $customer['re
                 <h2 class="h4 fw-bold text-primary">Customer Profile Review</h2>
                 <p class="text-muted small">ID: <?php echo $customer['customer_code']; ?></p>
             </div>
-            <a href="?page=pending_customers" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left"></i> Back to Pending
-            </a>
+            <div class="d-flex gap-2">
+                <a href="?page=add_loan_request&cid=<?php echo $customer_id; ?>" class="btn btn-primary btn-sm rounded-pill px-4">
+                    <i class="bi bi-plus-lg"></i> New Loan Request
+                </a>
+                <a href="?page=pending_customers" class="btn btn-outline-secondary btn-sm rounded-pill px-4">
+                    <i class="bi bi-arrow-left"></i> Back to Pending
+                </a>
+            </div>
         </div>
     </div>
 </div>

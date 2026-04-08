@@ -26,6 +26,8 @@ if (isset($_POST['add_customer'])) {
     $project            = trim($_POST['project']            ?? '');
     $project_location   = trim($_POST['project_location']   ?? '');
     $caution_location   = trim($_POST['caution_location']   ?? '');
+    $requested_amount   = floatval(str_replace(',', '', $_POST['requested_amount'] ?? 0));
+    $loan_duration      = intval($_POST['loan_duration'] ?? 0);
 
     $birth_place        = "N/A";
 
@@ -148,6 +150,8 @@ if (isset($_POST['add_customer'])) {
                 'doc_loan_clearance'  => $doc_loan_clearance,
                 'doc_power_of_attorney' => $doc_power_of_attorney,
                 'doc_guarantor_letter' => $doc_guarantor_letter,
+                'requested_amount'    => $requested_amount,
+                'loan_duration'       => $loan_duration,
             ];
 
             if (submitForApproval($conn, 'add', 'customer', null, $approval_data, "Add new customer: $customer_name")) {
@@ -520,6 +524,16 @@ function handle_file_upload($field, $upload_dir) {
                                 <option value="Agricultural" <?php echo ($form_data['loan_type'] ?? '') === 'Agricultural' ? 'selected' : ''; ?>>Agricultural Loan</option>
                                 <option value="Salon"        <?php echo ($form_data['loan_type'] ?? '') === 'Salon'        ? 'selected' : ''; ?>>Salon Loan</option>
                             </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Requested Injection (RWF)</label>
+                            <input type="text" class="form-control fw-bold text-primary" name="requested_amount" placeholder="e.g. 1,000,000"
+                                value="<?php echo number_format($form_data['requested_amount'] ?? 0); ?>">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Loan Duration (Months)</label>
+                            <input type="number" class="form-control fw-bold" name="loan_duration" placeholder="e.g. 6"
+                                value="<?php echo htmlspecialchars($form_data['loan_duration'] ?? ''); ?>">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Project (if applicable)</label>

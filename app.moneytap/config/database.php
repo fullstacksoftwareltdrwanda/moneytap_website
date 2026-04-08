@@ -1,8 +1,8 @@
 <?php
 // Detect environment
 // Detect environment
-$is_local = ($_SERVER['SERVER_NAME'] === 'localhost' || $_SERVER['REMOTE_ADDR'] === '127.0.0.1' || $_SERVER['REMOTE_ADDR'] === '::1');
-$is_hosted = (strpos($_SERVER['HTTP_HOST'], 'moneytap.rw') !== false);
+$is_local = (isset($_SERVER['SERVER_NAME']) && ($_SERVER['SERVER_NAME'] === 'localhost' || $_SERVER['REMOTE_ADDR'] === '127.0.0.1' || $_SERVER['REMOTE_ADDR'] === '::1')) || php_sapi_name() === 'cli';
+$is_hosted = (isset($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], 'moneytap.rw') !== false);
 
 if (!$is_hosted && $is_local) {
     // Local XAMPP MySQL Configuration

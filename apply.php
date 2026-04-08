@@ -414,6 +414,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['track_code'])) {
                                     <input type="number" name="requested_amount" required class="w-full p-6 bg-white/5 border border-white/10 rounded-3xl text-sm font-black text-white outline-none focus:border-brand-primary transition-all uppercase placeholder-white/20" placeholder="e.g. 500000">
                                 </div>
                                 <div class="space-y-4">
+                                    <label class="text-[9px] font-black uppercase text-brand-primary opacity-50 pl-4 tracking-[0.3em]">Duration (Months) *</label>
+                                    <input type="number" name="loan_duration" required class="w-full p-6 bg-white/5 border border-white/10 rounded-3xl text-sm font-black text-white outline-none focus:border-brand-primary transition-all uppercase placeholder-white/20" placeholder="e.g. 6">
+                                </div>
+                                <div class="space-y-4">
                                     <label class="text-[9px] font-black uppercase text-brand-primary opacity-50 pl-4 tracking-[0.3em]">Civil Status</label>
                                     <select name="marriage_type" class="w-full p-6 bg-white/5 border border-white/10 rounded-3xl text-sm font-black text-white outline-none focus:border-brand-primary transition-all cursor-pointer uppercase">
                                         <option value="Single">Single</option>

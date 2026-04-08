@@ -673,7 +673,8 @@ $filtered_loan_count = ($filter_status == 'all') ? $total_all_loans : ($status_c
                                    placeholder="Search loans..." value="<?php echo htmlspecialchars($search); ?>" style="width:170px;">
                             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                         </form>
-                        <a href="?page=addloan" class="btn btn-sm btn-success"><i class="bi bi-plus-lg"></i> New</a>
+                        <a href="?page=loan_requests" class="btn btn-sm btn-primary"><i class="bi bi-file-earmark-plus"></i> View Requests</a>
+                        <a href="?page=customers&show_inactive=1" class="btn btn-sm btn-success"><i class="bi bi-plus-lg"></i> New Loan Request</a>
                     </div>
                 </div>
                 <?php if ($filter_status !== 'all'): ?>

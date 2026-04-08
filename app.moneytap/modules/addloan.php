@@ -12,6 +12,19 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
+// ── NEW: FETCH FROM LOAN REQUEST ───────────────────────────────────────────
+$request_data = null;
+if (isset($_GET['req_id'])) {
+    $req_id = intval($_GET['req_id']);
+    $req_stmt = $conn->prepare("SELECT lr.*, c.customer_name FROM loan_requests lr 
+                               JOIN customers c ON lr.customer_id = c.customer_id 
+                               WHERE lr.id = ? AND lr.status = 'Approved'");
+    $req_stmt->bind_param("i", $req_id);
+    $req_stmt->execute();
+    $request_data = $req_stmt->get_result()->fetch_assoc();
+    $req_stmt->close();
+}
+
 // Account type constants
 define('ACCOUNT_TYPE_ASSET', 'asset');
 define('ACCOUNT_TYPE_LIABILITY', 'liability');
@@ -105,7 +118,7 @@ function IPMT($rate, $period, $nper, $pv) {
     return -$remaining_balance * $rate;
 }
 
-    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
+    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_upfront = false) {
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
     $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
@@ -138,7 +151,10 @@ function IPMT($rate, $period, $nper, $pv) {
         $interest = round($interest / 10) * 10;
         $management_fee = round($management_fee / 10) * 10;
         
-        $total_payment = $principal + $interest + $management_fee;
+        // Add 2% Requested Amount to 1st installment if not paid upfront
+        $req_amt_this_month = ($i == 1 && !$requested_upfront) ? $requested_amount : 0;
+        
+        $total_payment = $principal + $interest + $management_fee + $req_amt_this_month;
         $closing_balance = $opening_balance - $principal;
         
         if ($closing_balance < 0.01) $closing_balance = 0;
@@ -151,6 +167,7 @@ function IPMT($rate, $period, $nper, $pv) {
             'principal' => $principal,
             'interest' => $interest,
             'management_fee' => $management_fee,
+            'requested_amount' => $req_amt_this_month,
             'total_payment' => $total_payment,
             'closing_balance' => round($closing_balance, 2)
         ];
@@ -186,10 +203,10 @@ function calculateTotalInterest($total_disbursed, $interest_rate, $months, $mana
 }
 
 function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, 
-                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
+                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_upfront = false) {
     try {
         error_log("Creating installment schedule for loan #$loan_number");
-        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only);
+        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $requested_amount, $requested_upfront);
         $schedule = $schedule_data['schedule'];
         $disbursement_date_obj = new DateTime($disbursement_date);
         
@@ -202,7 +219,7 @@ function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_
             $sql = "INSERT INTO loan_instalments (
                 loan_id, loan_number, instalment_number, due_date,
                 opening_balance, principal_amount, interest_amount,
-                management_fee, total_payment, closing_balance,
+                management_fee, requested_amount, total_payment, closing_balance,
                 paid_amount, principal_paid, interest_paid, management_fee_paid,
                 balance_remaining, status, days_overdue, penalty_amount,
                 created_by, created_at
@@ -215,6 +232,7 @@ function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_
                 " . floatval($instalment['principal']) . ",
                 " . floatval($instalment['interest']) . ",
                 " . floatval($instalment['management_fee']) . ",
+                " . floatval($instalment['requested_amount']) . ",
                 " . floatval($instalment['total_payment']) . ",
                 " . floatval($instalment['closing_balance']) . ",
                 0, 0, 0, 0,
@@ -288,11 +306,32 @@ $default_requested_amount = round($default_total_disbursed * ($default_requested
 $default_rate = 5.0;
 $default_instalments = 6;
 
-$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee);
+$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, false);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
 $default_total_management_fees = $schedule_data['total_management_fees'];
 $default_total_payment = $schedule_data['total_payment'];
+
+// ── OVERRIDE DEFAULTS IF REQUEST EXISTS ────────────────────────────────────
+if ($request_data) {
+    $default_total_disbursed = floatval($request_data['total_disbursed']);
+    $default_management_fee_rate = floatval($request_data['management_fee_rate']);
+    $default_deduct_fee = (bool)$request_data['deduct_fee_from_disbursed'];
+    $default_rate = floatval($request_data['interest_rate']);
+    $default_instalments = intval($request_data['number_of_instalments']);
+    $default_requested_amount = floatval($request_data['requested_amount']);
+    $default_is_requested_paid_upfront = (bool)$request_data['is_requested_paid_upfront'];
+    
+    // Re-calc dependent defaults
+    $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
+    $default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
+    
+    $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_is_requested_paid_upfront);
+    $default_monthly_payment = $schedule_data['monthly_payment'];
+    $default_total_interest = $schedule_data['total_interest'];
+    $default_total_management_fees = $schedule_data['total_management_fees'];
+    $default_total_payment = $schedule_data['total_payment'];
+}
 
 // Default dates in dd/mm/yyyy format
 $default_disbursement_date = date('d/m/Y');
@@ -327,6 +366,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $deduct_fee = isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1';
         $mgmt_fee_first_month_only = isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1';
         $mgmt_fee_is_disbursed = isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1';
+        $requested_amount = parseMoney($_POST['requested_amount'] ?? '0');
+        $is_requested_paid_upfront = isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0;
 
         // -------------------------------------------------------
         // TOP-UP: Capture is_topup and topup_type
@@ -400,7 +441,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             } else {
                                 mysqli_free_result($check_result);
                                 
-                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only);
+                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only, $requested_amount, $is_requested_paid_upfront);
                                 $total_interest = $schedule_data['total_interest'];
                                 $total_management_fees = $schedule_data['total_management_fees'];
                                 $total_payment = $schedule_data['total_payment'];
@@ -457,6 +498,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'mgmt_fee_is_disbursed'  => $mgmt_fee_is_disbursed ? 1 : 0,
                                     'requested_amount'       => parseMoney($_POST['requested_amount'] ?? '0'),
                                     'is_requested_paid_upfront' => isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0,
+                                    'requested_amount_status' => (isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1') ? 'Paid' : 'Added to Installment',
+                                    'request_id'             => isset($_POST['request_id']) ? intval($_POST['request_id']) : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
 
@@ -465,6 +508,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $cname = $cname_res ? $cname_res->fetch_assoc()['customer_name'] : 'Customer #' . $customer_id;
 
                                 if (submitForApproval($conn, 'add', 'loan', null, $approval_data, "Add loan $loan_number for $cname")) {
+                                    // Mark request as disbursed
+                                    if (isset($_POST['request_id']) && !empty($_POST['request_id'])) {
+                                        $rid = intval($_POST['request_id']);
+                                        $conn->query("UPDATE loan_requests SET status = 'Disbursed' WHERE id = $rid");
+                                    }
+
+                                    // Create installments after approval is committed (will be done in approval_helper)
+                                    // But we need to ensure createInstallmentSchedule call in approval_helper includes new params!
                                     $_SESSION['success_message'] = "⏳ Loan <strong>$loan_number</strong> submitted for approval. It will be activated once Director or MD approves.";
                                     echo "<script>window.location.href = '?page=loans';</script>";
                                     exit();
@@ -565,23 +616,34 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="customer_id" class="form-label">Customer <span class="text-danger">*</span></label>
-                                <select class="form-select" id="customer_id" name="customer_id" required>
-                                    <option value="">Select Customer</option>
-                                    <?php if ($customers && mysqli_num_rows($customers) > 0): ?>
-                                        <?php
-                                        mysqli_data_seek($customers, 0);
-                                        while($customer = mysqli_fetch_assoc($customers)):
-                                        ?>
-                                            <option value="<?php echo htmlspecialchars($customer['customer_id']); ?>"
-                                                <?php echo isset($_POST['customer_id']) && $_POST['customer_id'] == $customer['customer_id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($customer['customer_name']); ?>
-                                                (<?php echo htmlspecialchars($customer['customer_code']); ?>)
-                                            </option>
-                                        <?php endwhile; ?>
-                                    <?php else: ?>
-                                        <option value="">No customers found</option>
-                                    <?php endif; ?>
-                                </select>
+                                <label for="customer_id" class="form-label">Customer <span class="text-danger">*</span></label>
+                                <?php if ($request_data): ?>
+                                    <div class="p-2 bg-info-subtle border border-info rounded-3 mb-2 small fw-bold text-info">
+                                        <i class="bi bi-link-45deg"></i> LINKED TO REQUEST #<?php echo $request_data['id']; ?>
+                                    </div>
+                                    <input type="hidden" name="customer_id" value="<?php echo $request_data['customer_id']; ?>">
+                                    <input type="hidden" name="request_id" value="<?php echo $request_data['id']; ?>">
+                                    <div class="form-control bg-light"><?php echo htmlspecialchars($request_data['customer_name']); ?></div>
+                                <?php else: ?>
+                                    <input type="hidden" name="request_id" value="">
+                                    <select class="form-select" id="customer_id" name="customer_id" required>
+                                        <option value="">Select Customer</option>
+                                        <?php if ($customers && mysqli_num_rows($customers) > 0): ?>
+                                            <?php
+                                            mysqli_data_seek($customers, 0);
+                                            while($customer = mysqli_fetch_assoc($customers)):
+                                            ?>
+                                                <option value="<?php echo htmlspecialchars($customer['customer_id']); ?>"
+                                                    <?php echo isset($_POST['customer_id']) && $_POST['customer_id'] == $customer['customer_id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($customer['customer_name']); ?>
+                                                    (<?php echo htmlspecialchars($customer['customer_code']); ?>)
+                                                </option>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <option value="">No customers found</option>
+                                        <?php endif; ?>
+                                    </select>
+                                <?php endif; ?>
                                 <div class="invalid-feedback">Please select a customer</div>
                             </div>
                         </div>
@@ -774,18 +836,31 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         </div>
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label for="requested_amount" class="form-label text-primary"><strong>Requested Amount (2%)</strong></label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control money-input bg-light" id="requested_amount"
-                                           name="requested_amount" readonly
-                                           value="<?php echo formatMoney($default_requested_amount); ?>">
-                                </div>
-                                <div class="form-check mt-1">
-                                    <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1">
-                                    <label class="form-check-label text-success" for="is_requested_paid_upfront">
-                                        <small><strong>Paid Upfront (Asset)</strong></small>
-                                    </label>
-                                </div>
+                                <?php if ($request_data): ?>
+                                    <label class="form-label text-primary"><strong>Requested Amount (2% Fee)</strong></label>
+                                    <div class="p-3 bg-primary-soft border border-primary rounded-4">
+                                        <div class="h5 fw-black text-primary mb-1">FRW <?php echo formatMoney($default_requested_amount); ?></div>
+                                        <div class="badge <?php echo $default_is_requested_paid_upfront ? 'bg-success' : 'bg-secondary'; ?> rounded-pill">
+                                            <?php echo $default_is_requested_paid_upfront ? '<i class="bi bi-check-circle-fill"></i> PAID UPFRONT' : 'IN INSTALLMENTS'; ?>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="requested_amount" id="requested_amount" value="<?php echo formatMoney($default_requested_amount); ?>">
+                                    <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="<?php echo $default_is_requested_paid_upfront ? '1' : '0'; ?>">
+                                <?php else: ?>
+                                    <label for="requested_amount" class="form-label text-primary"><strong>Requested Amount (2%)</strong></label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control money-input bg-light" id="requested_amount"
+                                               name="requested_amount" readonly
+                                               value="<?php echo formatMoney($default_requested_amount); ?>">
+                                    </div>
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1"
+                                            <?php echo (isset($default_is_requested_paid_upfront) && $default_is_requested_paid_upfront) ? 'checked' : ''; ?>>
+                                        <label class="form-check-label text-success" for="is_requested_paid_upfront">
+                                            <small><strong>Paid Upfront (Asset)</strong></small>
+                                        </label>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="col-md-2">
@@ -1059,13 +1134,17 @@ function calculateFromDisbursed() {
     
     if (totalDisbursed > 0) {
         const managementFeeFull = Math.round(totalDisbursed * (managementFeeRate / 100));
-        const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Requested Amount
+        
+        // Only calculate requested amount if NOT linked to a request
+        <?php if (!$request_data): ?>
+            const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Requested Amount
+            document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
+        <?php endif; ?>
         
         let loanAmount = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
         
         document.getElementById('loan_amount').value    = formatNumber(loanAmount);
         document.getElementById('management_fee').value = formatNumber(managementFeeFull);
-        document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
         
         const feeDesc = document.getElementById('fee_description');
         if (firstMonthOnly) {
@@ -1091,10 +1170,13 @@ function calculateFromDisbursed() {
                     : managementFeeFull * instalments;
             }
             
-            const requestedAmountFull = Math.round(totalDisbursed * 0.02);
-            const isRequestedUpfront = document.getElementById('is_requested_paid_upfront').checked;
+            const isRequestedUpfront = document.getElementById('is_requested_paid_upfront').type === 'checkbox' 
+                ? document.getElementById('is_requested_paid_upfront').checked 
+                : document.getElementById('is_requested_paid_upfront').value === '1';
             
-            const totalPayment = totalDisbursed + totalInterest + totalManagementFees + (isRequestedUpfront ? 0 : requestedAmountFull);
+            const requestedAmountValue = parseNumber(document.getElementById('requested_amount').value);
+            
+            const totalPayment = totalDisbursed + totalInterest + totalManagementFees + (isRequestedUpfront ? 0 : requestedAmountValue);
             const monthlyPayment = instalments > 1
                 ? Math.round((totalDisbursed + totalInterest + totalManagementFees) / instalments)
                 : (totalDisbursed + totalInterest + totalManagementFees);
