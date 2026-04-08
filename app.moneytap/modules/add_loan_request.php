@@ -23,6 +23,17 @@ $conn->query("CREATE TABLE IF NOT EXISTS loan_requests (
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
 )");
 
+// Ensure partial payment column exists
+$conn->query("ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS requested_amount_paid DECIMAL(15, 2) DEFAULT 0.00");
+
+function parseMoney($moneyString) {
+    return floatval(str_replace(',', '', $moneyString));
+}
+
+function formatMoney($amount, $decimals = 0) {
+    return number_format($amount, $decimals, '.', ',');
+}
+
 $success_message = '';
 $error_message = '';
 
@@ -48,95 +59,90 @@ if ($customer_id > 0) {
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
     $cid = intval($_POST['customer_id']);
-    $loan_amount = floatval(str_replace(',', '', $_POST['loan_amount']));
-    $interest_rate = floatval($_POST['interest_rate']);
-    $duration = intval($_POST['duration']);
-    $mgmt_rate = floatval($_POST['mgmt_fee_rate']);
-    $deduct_fee = isset($_POST['deduct_fee']) ? 1 : 0;
-    $mgmt_first_month = isset($_POST['mgmt_first_month']) ? 1 : 0;
+    $amt = parseMoney($_POST['loan_amount']);
+    $rate = floatval($_POST['interest_rate']);
+    $inst = intval($_POST['duration']);
+    $mgmt_r = floatval($_POST['mgmt_fee_rate']);
+    $deduct_f = isset($_POST['deduct_fee']) ? 1 : 0;
+    $mgmt_first = isset($_POST['mgmt_first_month']) ? 1 : 0;
     
-    // Requested Amount logic (2%)
-    $req_amt = floatval(str_replace(',', '', $_POST['requested_amount_fee']));
-    $req_upfront = isset($_POST['req_upfront']) ? 1 : 0;
+    $req_amt = parseMoney($_POST['requested_amount_fee']);
+    $req_paid = parseMoney($_POST['req_amt_paid'] ?? '0');
     
-    if ($cid <= 0 || $loan_amount <= 0) {
-        $error_message = "Please select a member and enter a valid loan amount.";
+    // VALIDATION: Prevent overpayment
+    if ($req_paid > $req_amt) {
+        $error_message = "Error: Amount paid upfront (FRW " . formatMoney($req_paid) . ") cannot exceed the total fee (FRW " . formatMoney($req_amt) . ").";
+        $cid = 0; // Trigger error block below
+    }
+
+    $is_paid_fully = ($req_paid >= $req_amt) ? 1 : 0;
+    $total_d = $amt; 
+    
+    if ($cid <= 0 || $amt <= 0) {
+        if (!$error_message) $error_message = "Please select a member and enter a valid loan amount.";
     } else {
-        // Calculate total disbursed if needed for persistence
-        $total_disbursed = $loan_amount; // For now assuming simple case
+        $prep = "INSERT INTO loan_requests (customer_id, loan_amount, total_disbursed, interest_rate, number_of_instalments, 
+                                         management_fee_rate, deduct_fee_from_disbursed, mgmt_fee_first_month_only, 
+                                         requested_amount, requested_amount_paid, is_requested_paid_upfront, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')";
+        $stmt = $conn->prepare($prep);
+        $stmt->bind_param("idddidddddi", $cid, $amt, $total_d, $rate, $inst, $mgmt_r, $deduct_f, $mgmt_first, $req_amt, $req_paid, $is_paid_fully);
         
-        $sql = "INSERT INTO loan_requests 
-                (customer_id, loan_amount, total_disbursed, interest_rate, number_of_instalments, 
-                 management_fee_rate, deduct_fee_from_disbursed, mgmt_fee_first_month_only, 
-                 requested_amount, is_requested_paid_upfront, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')";
         
-        $stmt = $conn->prepare($sql);
-        if ($stmt) {
-            $stmt->bind_param("idddiididi", 
-                $cid, $loan_amount, $total_disbursed, $interest_rate, $duration, 
-                $mgmt_rate, $deduct_fee, $mgmt_first_month, 
-                $req_amt, $req_upfront
-            );
+        if ($stmt->execute()) {
+            $new_request_id = $conn->insert_id;
             
-            if ($stmt->execute()) {
-                $new_request_id = $conn->insert_id;
+            // --- IMMEDIATE LEDGER RECORDING for partial fee paid upfront ---
+            if ($req_paid > 0) {
+                require_once __DIR__ . '/../includes/approval_helper.php';
+                $p_date = date('Y-m-d');
+                $narration = "Partial 2% Processing Fee Received Upfront - Req #" . $new_request_id;
+                
+                // 1. Credit Fee Income (4203)
+                $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
+                _helper_createLedgerEntry($conn, [
+                    'transaction_date' => $p_date,
+                    'class' => 'Fee Income',
+                    'account_code' => '4203',
+                    'account_name' => 'Requested Amount Income (2%)',
+                    'particular' => 'Partial Fee Payment Received',
+                    'voucher_number' => 'REQ-' . $new_request_id,
+                    'narration' => $narration,
+                    'beginning_balance' => $r_inc_beg,
+                    'debit_amount' => 0,
+                    'credit_amount' => $req_paid,
+                    'movement' => $req_paid,
+                    'ending_balance' => $r_inc_beg + $req_paid,
+                    'reference_type' => 'loan_request_fee',
+                    'reference_id' => $new_request_id,
+                    'created_by' => $_SESSION['user_id'] ?? 1
+                ]);
 
-                // --- IMMEDIATE LEDGER RECORDING for 2% Processing Fee if paid upfront ---
-                if ($req_upfront && $req_amt > 0) {
-                    require_once __DIR__ . '/../includes/approval_helper.php';
-                    
-                    $p_date = date('Y-m-d');
-                    $narration = "Processing Fee (2%) - Request #" . $new_request_id . " (Customer ID: $cid)";
-                    
-                    // 1. Recognize Income (4203)
-                    $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
-                    _helper_createLedgerEntry($conn, [
-                        'transaction_date' => $p_date,
-                        'class' => 'Revenue',
-                        'account_code' => '4203',
-                        'account_name' => 'Requested Amount Income (2%)',
-                        'particular' => 'Processing Fee Income',
-                        'voucher_number' => 'REQ-' . $new_request_id,
-                        'narration' => $narration,
-                        'beginning_balance' => $r_inc_beg,
-                        'debit_amount' => 0,
-                        'credit_amount' => $req_amt,
-                        'movement' => $req_amt,
-                        'ending_balance' => $r_inc_beg + $req_amt,
-                        'reference_type' => 'loan_request_fee',
-                        'reference_id' => $new_request_id,
-                        'created_by' => $_SESSION['user_id'] ?? 1
-                    ]);
-
-                    // 2. Debit Cash (1101) - since they paid upfront
-                    $c_beg = _helper_getBeginningBalance($conn, '1101', $p_date);
-                    _helper_createLedgerEntry($conn, [
-                        'transaction_date' => $p_date,
-                        'class' => 'Assets',
-                        'account_code' => '1101',
-                        'account_name' => 'Cash on Hand',
-                        'particular' => 'Processing Fee Received Upfront',
-                        'voucher_number' => 'REQ-' . $new_request_id,
-                        'narration' => $narration,
-                        'beginning_balance' => $c_beg,
-                        'debit_amount' => $req_amt,
-                        'credit_amount' => 0,
-                        'movement' => $req_amt,
-                        'ending_balance' => $c_beg + $req_amt,
-                        'reference_type' => 'loan_request_fee',
-                        'reference_id' => $new_request_id,
-                        'created_by' => $_SESSION['user_id'] ?? 1
-                    ]);
-                }
-
-                $success_message = "Loan request submitted successfully for review!";
-                echo "<script>setTimeout(() => window.location.href='?page=loan_requests', 2000);</script>";
-            } else {
-                $error_message = "Error: " . $stmt->error;
+                // 2. Debit Cash (1101)
+                $c_beg = _helper_getBeginningBalance($conn, '1101', $p_date);
+                _helper_createLedgerEntry($conn, [
+                    'transaction_date' => $p_date,
+                    'class' => 'Assets',
+                    'account_code' => '1101',
+                    'account_name' => 'Cash on Hand',
+                    'particular' => 'Partial Processing Fee Payment',
+                    'voucher_number' => 'REQ-' . $new_request_id,
+                    'narration' => $narration,
+                    'beginning_balance' => $c_beg,
+                    'debit_amount' => $req_paid,
+                    'credit_amount' => 0,
+                    'movement' => $req_paid,
+                    'ending_balance' => $c_beg + $req_paid,
+                    'reference_type' => 'loan_request_fee',
+                    'reference_id' => $new_request_id,
+                    'created_by' => $_SESSION['user_id'] ?? 1
+                ]);
             }
+
+            $success_message = "Loan request submitted successfully for review!";
+            echo "<script>setTimeout(() => window.location.href='?page=loan_requests', 2000);</script>";
         } else {
-            $error_message = "Prepare failed: " . $conn->error;
+            $error_message = "Error: " . $stmt->error;
         }
     }
 }
@@ -274,17 +280,26 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                         <div class="col-12 mt-5">
                             <div class="p-4 bg-primary-soft rounded-5 border-2 border-dashed border-primary">
                                 <div class="row g-4 align-items-center">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-black text-primary uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">Requested Amount (2% Processing Fee)</label>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-black text-primary uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Total 2% Fee (Calculated)</label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-primary"><i class="bi bi-tag-fill"></i></span>
-                                            <input type="text" name="requested_amount_fee" id="requested_amount_fee" class="form-control border-0 rounded-end-4 py-3 fw-black text-primary fs-5 shadow-sm" placeholder="0.00">
+                                            <input type="text" name="requested_amount_fee" id="requested_amount_fee" class="form-control border-0 rounded-end-4 py-3 fw-black text-primary fs-5 shadow-sm" style="color: #0d6efd !important;" readonly>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check form-switch card-style-check p-3 rounded-4 bg-white shadow-sm border-0 mt-4">
-                                            <input class="form-check-input ms-0 me-3" type="checkbox" name="req_upfront" id="req_upfront" onchange="updateSummary()">
-                                            <label class="form-check-label fw-bold text-dark mt-1" for="req_upfront">Pay Upfront (Immediate Income)</label>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-black text-success uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Amount Paid Upfront</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-success"><i class="bi bi-cash-stack"></i></span>
+                                            <input type="text" name="req_amt_paid" id="req_amt_paid" class="form-control border-0 rounded-end-4 py-3 fw-black text-success fs-5 shadow-sm" style="color: #198754 !important;" placeholder="0" onkeyup="formatMoneyInput(this); updateSummary()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-black text-danger uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Remaining to Loan</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-danger"><i class="bi bi-plus-circle"></i></span>
+                                            <input type="text" id="req_amt_remaining" class="form-control border-0 rounded-end-4 py-3 fw-black text-danger fs-5 shadow-sm bg-light" style="color: #dc3545 !important;" readonly placeholder="0">
+                                            <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="0">
                                         </div>
                                     </div>
                                 </div>
@@ -433,19 +448,46 @@ function updateSummary() {
     
     const mgmtRate = parseFloat(document.getElementById('mgmt_rate').value) || 0;
     const deductFee = document.getElementById('deduct_fee').checked;
-    const reqAmt = parseMoney(document.getElementById('requested_amount_fee').value);
-    const reqUpfront = document.getElementById('req_upfront').checked;
+    
+    // Processing Fee (2%) Logic
+    const fullReqAmt = Math.round(amount * 0.02);
+    document.getElementById('requested_amount_fee').value = formatMoney(fullReqAmt);
+    
+    const reqPaidNow = parseMoney(document.getElementById('req_amt_paid').value);
+    
+    if (reqPaidNow > fullReqAmt) {
+        alert("The amount paid upfront cannot be greater than the required 2% fee (FRW " + formatMoney(fullReqAmt) + ")");
+        document.getElementById('req_amt_paid').value = formatMoney(fullReqAmt);
+        updateSummary();
+        return;
+    }
+    
+    const remaining = Math.max(0, fullReqAmt - reqPaidNow);
+    document.getElementById('req_amt_remaining').value = formatMoney(remaining);
+    
+    // Set internal flag for "Upfront" (1 if fully paid)
+    document.getElementById('is_requested_paid_upfront').value = (reqPaidNow >= fullReqAmt) ? '1' : '0';
     
     let disbursed = amount;
     if (deductFee) {
         disbursed -= (amount * (mgmtRate / 100));
     }
     
-    // If 2% is paid upfront, it doesn't affect disbursed but it's an immediate cost to client
-    // Note: Usually 2% is paid ON TOP or deducted. The user asked for it to be like a fee.
-    
     document.getElementById('totalRepayText').innerText = 'FRW ' + formatMoney(amount);
     document.getElementById('disburseBadge').innerText = 'Disbursed: FRW ' + formatMoney(disbursed);
+}
+
+function formatMoneyInput(el) {
+    let cursor = el.selectionStart;
+    let oldVal = el.value;
+    let val = parseMoney(el.value);
+    if (isNaN(val)) {
+        el.value = '';
+        return;
+    }
+    el.value = formatMoney(val);
+    let diff = el.value.length - oldVal.length;
+    el.setSelectionRange(cursor + diff, cursor + diff);
 }
 
 // Input formatting for loan_amount

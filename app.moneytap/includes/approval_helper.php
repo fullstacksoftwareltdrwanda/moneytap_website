@@ -188,9 +188,11 @@ function executeApproval($conn, $approval) {
                 ? "'" . $conn->real_escape_string($d['topup_type']) . "'"
                 : "NULL";
 
-            $requested_amount  = floatval($d['requested_amount'] ?? 0);
-            $is_paid_upfront   = intval($d['is_requested_paid_upfront'] ?? 0);
-            $requested_status  = $is_paid_upfront ? 'Paid' : 'Added to Installment';
+            $requested_amount = floatval($d['requested_amount'] ?? 0);
+            $requested_paid   = floatval($d['requested_amount_paid_upfront'] ?? 0);
+            $requested_rem    = max(0, $requested_amount - $requested_paid);
+            $is_paid_fully    = ($requested_paid >= $requested_amount) ? 1 : 0;
+            $requested_status = $is_paid_fully ? 'Paid' : 'Added to Installment';
 
             $sql = "INSERT INTO loan_portfolio (
                 customer_id, loan_number, loan_amount, 
@@ -247,7 +249,7 @@ function executeApproval($conn, $approval) {
                 " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
                 " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . ",
-                $requested_amount, $is_paid_upfront, '$requested_status'
+                $requested_amount, $is_paid_fully, '$requested_status'
             )";
             
             if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error . " | SQL: " . $sql);
@@ -261,15 +263,14 @@ function executeApproval($conn, $approval) {
                 WHERE customer_id = " . intval($d['customer_id']));
 
             // Installment schedule
-            // If NOT paid upfront, add the requested_amount to the first installment
-            $requested_to_add = $is_paid_upfront ? 0 : $requested_amount;
+            // The REMAINDER that was NOT paid upfront stays as the "Requested Amount" for Month 1
             _helper_createInstallmentSchedule(
                 $conn, $new_loan_id, $d['loan_number'], $d['disbursement_date'],
                 $d['number_of_instalments'], 1,
                 $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], 
                 (bool)($d['deduct_fee_from_disbursed'] ?? 1),
                 (bool)($d['mgmt_fee_first_month_only'] ?? 0),
-                $requested_to_add
+                $requested_rem
             );
 
             // Transaction
@@ -383,71 +384,47 @@ function executeApproval($conn, $approval) {
                     }
                 }
 
-                if (!$already_recorded) {
-                    // Always recognize income
-                    $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
-                    _helper_createLedgerEntry($conn, [
-                        'transaction_date' => $p_date,
-                        'class' => 'Revenue',
-                        'account_code' => '4203',
-                        'account_name' => 'Requested Amount Income (2%)',
-                        'particular' => 'Processing Fee Income',
-                        'voucher_number' => $voucher_number,
-                        'narration' => $narration,
-                        'beginning_balance' => $r_inc_beg,
-                        'debit_amount' => 0,
-                        'credit_amount' => $requested_amount,
-                        'movement' => $requested_amount,
-                        'ending_balance' => $r_inc_beg + $requested_amount,
-                        'reference_type' => 'loan_disbursement',
-                        'reference_id' => $new_loan_id,
-                        'created_by' => 1
-                    ]);
-
-                    if ($is_paid_upfront) {
-                        // Debit Cash (assuming it was paid in cash/bank upfront)
-                        $c_code = ($bank_amt > 0) ? '1102' : '1101';
-                        $c_name = ($c_code === '1102') ? 'Bank Account' : 'Cash on Hand';
-                        $c_beg_up = _helper_getBeginningBalance($conn, $c_code, $p_date);
+                    if ($requested_rem > 0) {
+                        // Recognize REMAINING income (that wasn't recorded in the Request phase)
+                        $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
                         _helper_createLedgerEntry($conn, [
                             'transaction_date' => $p_date,
-                            'class' => 'Assets',
-                            'account_code' => $c_code,
-                            'account_name' => $c_name,
-                            'particular' => 'Processing Fee Received Upfront',
+                            'class' => 'Revenue',
+                            'account_code' => '4203',
+                            'account_name' => 'Requested Amount Income (2%)',
+                            'particular' => 'Remaining Processing Fee Income',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
-                            'beginning_balance' => $c_beg_up,
-                            'debit_amount' => $requested_amount,
-                            'credit_amount' => 0,
-                            'movement' => $requested_amount,
-                            'ending_balance' => $c_beg_up + $requested_amount,
+                            'beginning_balance' => $r_inc_beg,
+                            'debit_amount' => 0,
+                            'credit_amount' => $requested_rem,
+                            'movement' => $requested_rem,
+                            'ending_balance' => $r_inc_beg + $requested_rem,
                             'reference_type' => 'loan_disbursement',
                             'reference_id' => $new_loan_id,
                             'created_by' => 1
                         ]);
-                    } else {
-                        // Debit Receivable (1202)
+
+                        // Debit Receivable (1202) for the REMAINING part
                         $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
                         _helper_createLedgerEntry($conn, [
                             'transaction_date' => $p_date,
                             'class' => 'Assets',
                             'account_code' => '1202',
                             'account_name' => 'Requested Amount Receivable',
-                            'particular' => 'Accrued Processing Fee',
+                            'particular' => 'Accrued Processing Fee (Remaining)',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
                             'beginning_balance' => $rec_beg,
-                            'debit_amount' => $requested_amount,
+                            'debit_amount' => $requested_rem,
                             'credit_amount' => 0,
-                            'movement' => $requested_amount,
-                            'ending_balance' => $rec_beg + $requested_amount,
+                            'movement' => $requested_rem,
+                            'ending_balance' => $rec_beg + $requested_rem,
                             'reference_type' => 'loan_disbursement',
                             'reference_id' => $new_loan_id,
                             'created_by' => 1
                         ]);
                     }
-                }
             }
 
             require_once __DIR__ . '/activity_logger.php';

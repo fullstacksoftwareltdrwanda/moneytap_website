@@ -118,7 +118,12 @@ function IPMT($rate, $period, $nper, $pv) {
     return -$remaining_balance * $rate;
 }
 
-    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_upfront = false) {
+    function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_amount_paid = 0) {
+    if ($requested_amount_paid >= $requested_amount) {
+        $requested_remaining = 0;
+    } else {
+        $requested_remaining = $requested_amount - $requested_amount_paid;
+    }
     $schedule = [];
     $monthly_rate = $interest_rate / 100;
     $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
@@ -151,8 +156,8 @@ function IPMT($rate, $period, $nper, $pv) {
         $interest = round($interest / 10) * 10;
         $management_fee = round($management_fee / 10) * 10;
         
-        // Add 2% Requested Amount to 1st installment if not paid upfront
-        $req_amt_this_month = ($i == 1 && !$requested_upfront) ? $requested_amount : 0;
+        // Add remaining requested amount to 1st installment
+        $req_amt_this_month = ($i == 1) ? $requested_remaining : 0;
         
         $total_payment = $principal + $interest + $management_fee + $req_amt_this_month;
         $closing_balance = $opening_balance - $principal;
@@ -185,7 +190,7 @@ function IPMT($rate, $period, $nper, $pv) {
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
         'total_management_fees' => round($total_management_fees, 2),
-        'total_payment' => round($total_principal + $total_interest + $total_management_fees, 2),
+        'total_payment' => round($total_principal + $total_interest + $total_management_fees + $requested_remaining, 2),
         'monthly_payment' => $monthly_payment
     ];
 }
@@ -203,10 +208,10 @@ function calculateTotalInterest($total_disbursed, $interest_rate, $months, $mana
 }
 
 function createInstallmentSchedule($conn, $loan_id, $loan_number, $disbursement_date, 
-                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_upfront = false) {
+                                 $number_of_instalments, $user_id, $total_disbursed, $interest_rate, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_amount_paid = 0) {
     try {
         error_log("Creating installment schedule for loan #$loan_number");
-        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $requested_amount, $requested_upfront);
+        $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $first_month_only, $requested_amount, $requested_amount_paid);
         $schedule = $schedule_data['schedule'];
         $disbursement_date_obj = new DateTime($disbursement_date);
         
@@ -306,7 +311,7 @@ $default_requested_amount = round($default_total_disbursed * ($default_requested
 $default_rate = 5.0;
 $default_instalments = 6;
 
-$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, false);
+$schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, 0);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
 $default_total_management_fees = $schedule_data['total_management_fees'];
@@ -320,13 +325,14 @@ if ($request_data) {
     $default_rate = floatval($request_data['interest_rate']);
     $default_instalments = intval($request_data['number_of_instalments']);
     $default_requested_amount = floatval($request_data['requested_amount']);
+    $default_requested_paid = floatval($request_data['requested_amount_paid'] ?? 0);
     $default_is_requested_paid_upfront = (bool)$request_data['is_requested_paid_upfront'];
     
     // Re-calc dependent defaults
     $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
     $default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
     
-    $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_is_requested_paid_upfront);
+    $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_requested_paid);
     $default_monthly_payment = $schedule_data['monthly_payment'];
     $default_total_interest = $schedule_data['total_interest'];
     $default_total_management_fees = $schedule_data['total_management_fees'];
@@ -367,6 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $mgmt_fee_first_month_only = isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1';
         $mgmt_fee_is_disbursed = isset($_POST['mgmt_fee_is_disbursed']) && $_POST['mgmt_fee_is_disbursed'] == '1';
         $requested_amount = parseMoney($_POST['requested_amount'] ?? '0');
+        $requested_amount_paid = parseMoney($_POST['requested_amount_paid'] ?? '0');
         $is_requested_paid_upfront = isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0;
 
         // -------------------------------------------------------
@@ -441,7 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             } else {
                                 mysqli_free_result($check_result);
                                 
-                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only, $requested_amount, $is_requested_paid_upfront);
+                                $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only, $requested_amount, $requested_amount_paid);
                                 $total_interest = $schedule_data['total_interest'];
                                 $total_management_fees = $schedule_data['total_management_fees'];
                                 $total_payment = $schedule_data['total_payment'];
@@ -496,9 +503,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'deduct_fee_from_disbursed' => $deduct_fee ? 1 : 0,
                                     'mgmt_fee_first_month_only' => $mgmt_fee_first_month_only ? 1 : 0,
                                     'mgmt_fee_is_disbursed'  => $mgmt_fee_is_disbursed ? 1 : 0,
-                                    'requested_amount'       => parseMoney($_POST['requested_amount'] ?? '0'),
-                                    'is_requested_paid_upfront' => isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0,
-                                    'requested_amount_status' => (isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1') ? 'Paid' : 'Added to Installment',
+                                    'requested_amount'       => $requested_amount,
+                                    'requested_amount_paid_upfront' => $requested_amount_paid,
+                                    'is_requested_paid_upfront' => $is_requested_paid_upfront,
+                                    'requested_amount_status' => ($requested_amount_paid >= $requested_amount) ? 'Paid' : 'Added to Installment',
                                     'request_id'             => isset($_POST['request_id']) ? intval($_POST['request_id']) : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
@@ -837,15 +845,26 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         <div class="col-md-3">
                             <div class="mb-3">
                                 <?php if ($request_data): ?>
-                                    <label class="form-label text-primary"><strong>Requested Amount (2% Fee)</strong></label>
+                                    <label class="form-label text-primary"><strong>2% Processing Fee Details</strong></label>
                                     <div class="p-3 bg-primary-soft border border-primary rounded-4">
-                                        <div class="h5 fw-black text-primary mb-1">FRW <?php echo formatMoney($default_requested_amount); ?></div>
-                                        <div class="badge <?php echo $default_is_requested_paid_upfront ? 'bg-success' : 'bg-secondary'; ?> rounded-pill">
-                                            <?php echo $default_is_requested_paid_upfront ? '<i class="bi bi-check-circle-fill"></i> PAID UPFRONT' : 'IN INSTALLMENTS'; ?>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <small class="text-muted d-block uppercase" style="font-size: 0.65rem;">Total Fee:</small>
+                                                <div class="fw-bold">FRW <?php echo formatMoney($default_requested_amount); ?></div>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted d-block uppercase" style="font-size: 0.65rem;">Paid Upfront:</small>
+                                                <div class="fw-bold text-success">- FRW <?php echo formatMoney($default_requested_paid); ?></div>
+                                            </div>
+                                            <div class="col-12 mt-2 pt-2 border-top">
+                                                <small class="text-muted d-block uppercase" style="font-size: 0.65rem;">To be added to 1st Installment:</small>
+                                                <div class="h5 fw-black text-danger">FRW <?php echo formatMoney($requested_amount_remaining); ?></div>
+                                            </div>
                                         </div>
                                     </div>
                                     <input type="hidden" name="requested_amount" id="requested_amount" value="<?php echo formatMoney($default_requested_amount); ?>">
-                                    <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="<?php echo $default_is_requested_paid_upfront ? '1' : '0'; ?>">
+                                    <input type="hidden" name="requested_amount_paid" value="<?php echo formatMoney($default_requested_paid); ?>">
+                                    <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="<?php echo ($requested_amount_remaining <= 0) ? '1' : '0'; ?>">
                                 <?php else: ?>
                                     <label for="requested_amount" class="form-label text-primary"><strong>Requested Amount (2%)</strong></label>
                                     <div class="input-group">
@@ -853,12 +872,11 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                                name="requested_amount" readonly
                                                value="<?php echo formatMoney($default_requested_amount); ?>">
                                     </div>
-                                    <div class="form-check mt-1">
-                                        <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1"
-                                            <?php echo (isset($default_is_requested_paid_upfront) && $default_is_requested_paid_upfront) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label text-success" for="is_requested_paid_upfront">
-                                            <small><strong>Paid Upfront (Asset)</strong></small>
-                                        </label>
+                                    <div class="row g-2 mt-1">
+                                        <div class="col-12">
+                                            <small class="text-muted">Paid Upfront:</small>
+                                            <input type="text" name="requested_amount_paid" class="form-control form-control-sm money-input" onkeyup="formatMoneyInput(this)" value="0">
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </div>
