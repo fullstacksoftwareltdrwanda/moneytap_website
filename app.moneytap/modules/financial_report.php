@@ -522,13 +522,26 @@ switch ($report_type) {
              JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
              WHERE lp2.customer_id = c.customer_id AND li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59') as pen_pd,
             
-            -- Disbursement Fee (Upfront fees)
-            (SELECT SUM(lp2.management_fee_amount) 
-             FROM loan_portfolio lp2 
-             WHERE lp2.customer_id = c.customer_id 
-               AND lp2.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' 
-               AND (lp2.deduct_fee_from_disbursed = 1 OR lp2.mgmt_fee_first_month_only = 1)) as disb_pd,
-            
+            -- Requested Amount Income (Upfront + Installment Paid)
+            (
+                COALESCE((SELECT SUM(lp2.requested_amount) 
+                 FROM loan_portfolio lp2 
+                 WHERE lp2.customer_id = c.customer_id 
+                   AND lp2.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' 
+                   AND lp2.is_requested_paid_upfront = 1), 0)
+                +
+                COALESCE((SELECT SUM(lr.requested_amount) 
+                 FROM loan_requests lr 
+                 WHERE lr.customer_id = c.customer_id 
+                   AND lr.created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' 
+                   AND lr.is_requested_paid_upfront = 1 AND lr.status != 'Disbursed'), 0)
+                +
+                COALESCE((SELECT SUM(li.requested_amount_paid) 
+                 FROM loan_instalments li 
+                 JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
+                 WHERE lp2.customer_id = c.customer_id AND li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59'), 0)
+            ) as req_pd,
+
             (SELECT SUM(af.income_amount) 
              FROM application_fees af 
              WHERE af.customer_id = c.customer_id AND af.fee_date BETWEEN '$start_date' AND '$query_end_date') as app_pd,
@@ -1555,6 +1568,7 @@ switch ($report_type) {
                                                             <th class="text-end">Interest</th>
                                                             <th class="text-end">Periodic Mgmt</th>
                                                             <th class="text-end">Disbursement</th>
+                                                            <th class="text-end">Requested (2%)</th>
                                                             <th class="text-end">App Fee</th>
                                                             <th class="text-end">Penalties</th>
                                                             <th class="text-end text-danger">Int. Left</th>
@@ -1564,10 +1578,10 @@ switch ($report_type) {
                                                     </thead>
                                                     <tbody>
                                                         <?php 
-                                                        $gt_int=0; $gt_mgmt=0; $gt_disb=0; $gt_app=0; $gt_pen=0; $gt_total=0;
+                                                        $gt_int=0; $gt_mgmt=0; $gt_disb=0; $gt_req=0; $gt_app=0; $gt_pen=0; $gt_total=0;
                                                         foreach ($unified_revenue as $r): 
-                                                            $row_total = $r['int_pd'] + $r['mgmt_pd'] + $r['disb_pd'] + $r['app_pd'] + $r['pen_pd'];
-                                                            $gt_int+=$r['int_pd']; $gt_mgmt+=$r['mgmt_pd']; $gt_disb+=$r['disb_pd'];
+                                                            $row_total = $r['int_pd'] + $r['mgmt_pd'] + $r['disb_pd'] + $r['req_pd'] + $r['app_pd'] + $r['pen_pd'];
+                                                            $gt_int+=$r['int_pd']; $gt_mgmt+=$r['mgmt_pd']; $gt_disb+=$r['disb_pd']; $gt_req+=$r['req_pd'];
                                                             $gt_app+=$r['app_pd']; $gt_pen+=$r['pen_pd']; $gt_total+=$row_total;
                                                         ?>
                                                         <tr>
@@ -1575,6 +1589,7 @@ switch ($report_type) {
                                                             <td class="text-end"><?php echo formatMoney($r['int_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['mgmt_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['disb_pd']); ?></td>
+                                                            <td class="text-end text-primary fw-bold"><?php echo formatMoney($r['req_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['app_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['pen_pd']); ?></td>
                                                             <td class="text-end text-danger"><?php echo formatMoney($r['int_bal']); ?></td>
@@ -1589,6 +1604,7 @@ switch ($report_type) {
                                                             <td class="text-end"><?php echo formatMoney($gt_int); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_mgmt); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_disb); ?></td>
+                                                            <td class="text-end text-primary"><?php echo formatMoney($gt_req); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_app); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_pen); ?></td>
                                                             <td class="text-end" colspan="2">--</td>

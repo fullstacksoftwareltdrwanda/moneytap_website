@@ -338,31 +338,34 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
     padding: 12px !important;
     transition: all 0.2s;
 }
-/* FORCE BLACK TEXT ON ALL ELEMENTS for visibility */
-#loanRequestForm input, 
-#loanRequestForm select, 
-#loanRequestForm .form-control,
-#loanRequestForm .form-select,
+
+/* BRUTE FORCE VISIBILITY FIX */
+#loanRequestForm .form-label, 
+#loanRequestForm label,
 #loanRequestForm .fw-bold, 
 #loanRequestForm .fw-black,
 #loanRequestForm .text-dark,
+#loanRequestForm .form-control,
+#loanRequestForm .form-select,
 .select2-selection__rendered,
-.select2-results__option {
+.select2-results__option,
+.select2-search__field {
     color: #000 !important;
+    -webkit-text-fill-color: #000 !important; /* Some browsers need this */
 }
 
-/* Select2 Custom Styling for Premium Look & Visibility */
-.select2-container--default .select2-selection--single {
-    height: 60px !important;
-    background-color: #fff !important;
-    border: 2px solid #cfe2ff !important;
-    border-radius: 1rem !important;
-    padding: 12px !important;
-    transition: all 0.2s;
+#loanRequestForm .text-muted {
+    color: #666 !important;
 }
+
+#loanRequestForm .avatar-sm {
+    color: #fff !important; /* Keep avatar letter white */
+}
+
+/* Select2 Specifics */
 .select2-container--default .select2-selection--single .select2-selection__rendered {
     font-weight: 700 !important;
-    line-height: normal !important;
+    line-height: 34px !important;
 }
 .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 58px !important;

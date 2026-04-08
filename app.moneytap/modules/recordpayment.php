@@ -892,7 +892,7 @@ try {
                                                 updated_at           = NOW()
                                             WHERE instalment_id = ?";
                     $update_stmt = $conn->prepare($update_instalment_query);
-                    $update_stmt->bind_param("dddddddsisi",
+                    $update_stmt->bind_param("ddddddddsisi",
                         $total_paid,
                         $principal_paid,
                         $interest_paid,
