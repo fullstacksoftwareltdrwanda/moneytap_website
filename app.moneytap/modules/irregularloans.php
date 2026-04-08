@@ -566,7 +566,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         
         $collateral_type = mysqli_real_escape_string($conn, $_POST['collateral_type'] ?? '');
-        $collateral_description = mysqli_real_escape_string($conn, $_POST['collateral_description'] ?? '');
+        $collateral_sub_type = mysqli_real_escape_string($conn, $_POST['collateral_sub_type'] ?? '');
+        $upi_location = mysqli_real_escape_string($conn, $_POST['upi_location'] ?? '');
+        $square_mtrs = mysqli_real_escape_string($conn, $_POST['square_mtrs'] ?? '');
+        
+        $base_desc = trim($_POST['collateral_description'] ?? '');
+        $desc_parts = [];
+        if ($collateral_sub_type) $desc_parts[] = "Type: $collateral_sub_type";
+        if ($upi_location) $desc_parts[] = "UPI: $upi_location";
+        if ($square_mtrs) $desc_parts[] = "Size: $square_mtrs";
+        
+        $collateral_description = $base_desc;
+        if (count($desc_parts) > 0) {
+            if ($collateral_description) {
+                $collateral_description .= " | " . implode(", ", $desc_parts);
+            } else {
+                $collateral_description = implode(", ", $desc_parts);
+            }
+        }
+        $collateral_description = mysqli_real_escape_string($conn, $collateral_description);
+
         $collateral_value = parseMoney($_POST['collateral_value'] ?? '0');
         $collateral_net_value = parseMoney($_POST['collateral_net_value'] ?? '0');
         
@@ -1145,24 +1164,44 @@ function createIrregularTransactionRecord($conn, $loan_id, $loan_number, $type, 
                     <hr>
                     <h6 class="mb-3">Collateral Information</h6>
                     <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="collateral_type" class="form-label">Collateral Type</label>
-                                <select class="form-select" id="collateral_type" name="collateral_type">
-                                    <option value="">Select Type</option>
-                                    <?php
-                                    $collateral_types = ['Land', 'House', 'Vehicle', 'Equipment', 'Guarantor', 'Other'];
-                                    foreach ($collateral_types as $type):
-                                        $selected = (isset($_POST['collateral_type']) && $_POST['collateral_type'] == $type) ? 'selected' : '';
-                                    ?>
-                                    <option value="<?php echo $type; ?>" <?php echo $selected; ?>>
-                                        <?php echo $type; ?>
-                                    </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Collateral Type</label>
+                            <select class="form-select" name="collateral_type" id="collateral_type" onchange="toggleCollateralOptions()">
+                                <option value="">Select Category</option>
+                                <option value="Movable"   <?php echo (isset($_POST['collateral_type']) && $_POST['collateral_type'] === 'Movable') ? 'selected' : ''; ?>>Movable</option>
+                                <option value="Immovable" <?php echo (isset($_POST['collateral_type']) && $_POST['collateral_type'] === 'Immovable') ? 'selected' : ''; ?>>Immovable</option>
+                            </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 mb-3 d-none" id="movable_section">
+                            <label class="form-label">Movable Asset</label>
+                            <select class="form-select" name="collateral_sub_type" id="movable_sub_type">
+                                <option value="Car" <?php echo (isset($_POST['collateral_sub_type']) && $_POST['collateral_sub_type'] === 'Car') ? 'selected' : ''; ?>>Car</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3 d-none" id="immovable_section">
+                            <label class="form-label">Immovable Asset</label>
+                            <select class="form-select" name="collateral_sub_type" id="immovable_sub_type" onchange="toggleImmovableDetails()">
+                                <option value="">Select Type</option>
+                                <option value="House" <?php echo (isset($_POST['collateral_sub_type']) && $_POST['collateral_sub_type'] === 'House') ? 'selected' : ''; ?>>House</option>
+                                <option value="Land"  <?php echo (isset($_POST['collateral_sub_type']) && $_POST['collateral_sub_type'] === 'Land') ? 'selected' : ''; ?>>Land</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row d-none" id="land_details_section">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">UPI Location</label>
+                            <input type="text" class="form-control" id="upi_location" name="upi_location" placeholder="e.g. 1/02/03/04/..."
+                                value="<?php echo htmlspecialchars($_POST['upi_location'] ?? ''); ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Square Mtrs</label>
+                            <input type="text" class="form-control" id="square_mtrs" name="square_mtrs" placeholder="e.g. 500 sqm"
+                                value="<?php echo htmlspecialchars($_POST['square_mtrs'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="collateral_value" class="form-label">Collateral Value</label>
                                 <input type="text" class="form-control money-input" id="collateral_value"
@@ -1170,7 +1209,7 @@ function createIrregularTransactionRecord($conn, $loan_id, $loan_number, $type, 
                                        value="<?php echo isset($_POST['collateral_value']) ? formatMoney(parseMoney($_POST['collateral_value'])) : '0'; ?>">
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="collateral_net_value" class="form-label">Net Value</label>
                                 <input type="text" class="form-control money-input" id="collateral_net_value"
@@ -1431,6 +1470,86 @@ document.getElementById('irregularLoanForm')?.addEventListener('submit', functio
         finalPaymentInput.value = rawValue;
     }
 });
+
+// Auto-fetch collateral from customer when selected
+const customerSelect = document.getElementById('customer_id');
+
+function fetchCustomerCollateral(cid) {
+    if (!cid) return;
+    fetch('?page=ajax_get_customer_collateral&customer_id=' + cid)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.error) {
+                let typeSelect = document.getElementById('collateral_type');
+                let movableSub = document.getElementById('movable_sub_type');
+                let immovableSub = document.getElementById('immovable_sub_type');
+                let upiInput = document.getElementById('upi_location');
+                let sqmInput = document.getElementById('square_mtrs');
+                
+                if (data.collateral_type && typeSelect) {
+                    typeSelect.value = data.collateral_type;
+                    
+                    if (data.collateral_type === 'Movable' && data.collateral_sub_type && movableSub) {
+                        movableSub.value = data.collateral_sub_type;
+                    } else if (data.collateral_type === 'Immovable' && data.collateral_sub_type && immovableSub) {
+                        immovableSub.value = data.collateral_sub_type;
+                    }
+                    
+                    if (data.upi_location && upiInput) {
+                        upiInput.value = data.upi_location;
+                    }
+                    if (data.square_mtrs && sqmInput) {
+                        sqmInput.value = data.square_mtrs;
+                    }
+                    
+                    toggleCollateralOptions();
+                }
+            }
+        }).catch(console.error);
+}
+
+if (customerSelect) {
+    customerSelect.addEventListener('change', function() {
+        fetchCustomerCollateral(this.value);
+    });
+    
+    // Auto-trigger on load if there's a pre-selected customer
+    document.addEventListener('DOMContentLoaded', function() {
+        if (customerSelect.value) {
+            fetchCustomerCollateral(customerSelect.value);
+        }
+        
+        if (document.getElementById('collateral_type')) {
+            toggleCollateralOptions();
+        }
+    });
+}
+
+// Add JS for toggling Movable/Immovable
+function toggleCollateralOptions() {
+    const type = document.getElementById('collateral_type')?.value;
+    const movableSec = document.getElementById('movable_section');
+    const immovableSec = document.getElementById('immovable_section');
+    const landDetails = document.getElementById('land_details_section');
+    
+    if (movableSec) movableSec.classList.toggle('d-none', type !== 'Movable');
+    if (immovableSec) immovableSec.classList.toggle('d-none', type !== 'Immovable');
+    
+    if (type !== 'Immovable' && landDetails) {
+        landDetails.classList.add('d-none');
+    } else if (type === 'Immovable') {
+        toggleImmovableDetails();
+    }
+}
+
+function toggleImmovableDetails() {
+    const subtype = document.getElementById('immovable_sub_type')?.value;
+    const landDetails = document.getElementById('land_details_section');
+    if (landDetails) {
+        landDetails.classList.toggle('d-none', subtype !== 'Land');
+    }
+}
+
 </script>
 <?php
 if (isset($conn)) {
