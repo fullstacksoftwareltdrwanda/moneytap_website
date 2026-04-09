@@ -379,8 +379,11 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 #loanRequestForm option,
 /* Force black text for all select2 elements */
 .select2-container .select2-selection__rendered,
+.select2-container .select2-selection__placeholder,
 span.select2-selection__rendered,
+span.select2-selection__placeholder,
 .select2-selection__rendered,
+.select2-selection__placeholder,
 .select2-results__option,
 .select2-search__field {
     color: #000000 !important;
