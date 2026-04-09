@@ -62,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Identity Hub | MoneyTap</title>
-    <link rel="icon" type="image/png" href="https://yourmainwebsite.com/images/COMPANY%20LOGO.png">
+    <title>Identity Hub | Moneytap</title>
+    <link rel="icon" type="image/png" href="../favicon.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             margin: 0;
             font-family: 'Plus Jakarta Sans', sans-serif;
             overflow: hidden;
-            background: #0B0F19;
+            background: #f8fafc; /* Professional light background */
             font-size: 15px;
         }
         
@@ -86,16 +86,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             position: absolute;
             bottom: 8%;
             left: 8%;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.85); /* More opaque for light theme */
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             padding: 32px;
             border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: #1e293b; /* Dark text for light panel */
             z-index: 10;
             max-width: 380px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
         
         .glass-panel h3 {
@@ -136,13 +136,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         .footer-branding {
             position: absolute;
             bottom: 24px;
-            color: #64748B;
+            color: #94a3b8;
             font-size: 0.8rem;
             font-weight: 500;
             letter-spacing: 0.05em;
         }
         .footer-branding span {
-            color: #E2E8F0;
+            color: #475569;
             font-weight: 700;
         }
         .login-wrapper {
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         }
         .login-side-image {
             flex: 1.2;
-            background: url('https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&q=80&w=2000') no-repeat center center;
+            background: url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=2000') no-repeat center center;
             background-size: cover;
             position: relative;
             display: none; /* Hidden on mobile */
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(to right, rgba(11, 15, 25, 0.8), rgba(11, 15, 25, 0.2));
+            background: linear-gradient(to right, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0));
         }
         .login-side-content {
             flex: 1;
@@ -173,9 +173,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             justify-content: center;
             align-items: center;
             padding: 40px;
-            background: #0B0F19;
+            background: #ffffff;
             position: relative;
-            color: #fff;
+            color: #1e293b;
         }
         .login-container {
             width: 100%;
@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         }
         .login-header h2 {
             font-weight: 800;
-            color: #fff;
+            color: #1e293b;
             font-size: 2rem;
             margin-bottom: 8px;
             letter-spacing: -0.04em;
@@ -214,10 +214,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             margin-bottom: 10px;
         }
         .input-group {
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #e2e8f0;
             border-radius: 16px;
             transition: all 0.3s;
-            background: rgba(255, 255, 255, 0.03);
+            background: #f8fafc;
             overflow: hidden;
             padding: 2px;
         }
@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             font-weight: 600;
             font-size: 0.95rem;
             background: transparent;
-            color: #fff !important;
+            color: #1e293b !important;
         }
         .form-control::placeholder {
             color: #475569;
@@ -248,8 +248,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             background: transparent;
         }
         .btn-login {
-            background: var(--primary);
-            color: #0B0F19;
+            background: #0f172a; /* Solid dark blue for premium feel */
+            color: #ffffff;
             border: none;
             padding: 16px;
             border-radius: 16px;
@@ -261,9 +261,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             letter-spacing: 0.05em;
         }
         .btn-login:hover {
-            background: #00F0AC;
+            background: #1e293b;
             transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(0, 208, 148, 0.3);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
         }
         .back-link {
             margin-top: 32px;
@@ -298,8 +298,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             margin-top: 24px;
         }
         .form-check-input {
-            background-color: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.1);
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
         }
         .form-check-input:checked {
             background-color: var(--primary);
@@ -311,10 +311,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
     <div class="login-wrapper">
         <div class="login-side-image">
             <div class="glass-panel">
-                <h3>Company Name</h3>
+                <h3>Moneytap</h3>
                 <div class="mt-2">
-                    <p style="font-weight: 700; font-size: 1.05rem; margin-bottom: 5px;">Trusted Financial Partner</p>
-                    <p style="font-size: 1.15rem; line-height: 1.4;">Empowering Your<br>Financial Journey</p>
+                    <p style="font-weight: 700; font-size: 1.05rem; margin-bottom: 5px;">Your Smart Financial Partner</p>
+                    <p style="font-size: 1.15rem; line-height: 1.4;">Simplify Your Accounting<br>& Loan Management</p>
                 </div>
             </div>
         </div>
