@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Identity Hub | MoneyTap</title>
+    <link rel="icon" type="image/png" href="https://yourmainwebsite.com/images/COMPANY%20LOGO.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -78,6 +79,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             font-family: 'Plus Jakarta Sans', sans-serif;
             overflow: hidden;
             background: #0B0F19;
+            font-size: 15px;
+        }
+        
+        .glass-panel {
+            position: absolute;
+            bottom: 8%;
+            left: 8%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 32px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            z-index: 10;
+            max-width: 380px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .glass-panel h3 {
+            margin: 0;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            font-size: 1.8rem;
+        }
+
+        .top-nav-link {
+            position: absolute;
+            top: 24px;
+            right: 32px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 20px;
+            border-radius: 50px;
+            color: #94A3B8;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .top-nav-link:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        .top-nav-link i {
+            margin-right: 6px;
+            font-size: 1.3rem;
+            line-height: 0;
+        }
+        
+        .footer-branding {
+            position: absolute;
+            bottom: 24px;
+            color: #64748B;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+        .footer-branding span {
+            color: #E2E8F0;
+            font-weight: 700;
         }
         .login-wrapper {
             display: flex;
@@ -113,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         }
         .login-container {
             width: 100%;
-            max-width: 400px;
+            max-width: 380px; /* Reduced from 440px */
         }
         .logo-box {
             width: 60px;
@@ -243,15 +309,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
 </head>
 <body>
     <div class="login-wrapper">
-        <div class="login-side-image"></div>
+        <div class="login-side-image">
+            <div class="glass-panel">
+                <h3>Company Name</h3>
+                <div class="mt-2">
+                    <p style="font-weight: 700; font-size: 1.05rem; margin-bottom: 5px;">Trusted Financial Partner</p>
+                    <p style="font-size: 1.15rem; line-height: 1.4;">Empowering Your<br>Financial Journey</p>
+                </div>
+            </div>
+        </div>
         <div class="login-side-content">
+            <a href="https://yourmainwebsite.com" class="top-nav-link">
+                <i class="bi bi-arrow-left-short"></i> Main Website
+            </a>
             <div class="login-container">
                 <div class="logo-box">
                     <i class="bi bi-cpu-fill text-dark fs-3"></i>
                 </div>
                 <div class="login-header">
-                    <h2>MoneyTap Portal</h2>
-                    <p>Authorization required to access ecosystem.</p>
+                    <h2>Welcome back to your Accounting Loan MS</h2>
+                    <p>Enter your credentials to securely access your portal</p>
                 </div>
                 
                 <form id="loginForm" method="POST">
@@ -288,10 +365,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
                     </div>
                     <?php endif; ?>
                 </form>
-
-                <a href="../" class="back-link">
-                    <i class="bi bi-arrow-left"></i> Return to Terminal
-                </a>
+            </div>
+            
+            <div class="footer-branding">
+                powered by <span>Fullstack LTD</span>
             </div>
         </div>
     </div>
