@@ -674,7 +674,7 @@ $filtered_loan_count = ($filter_status == 'all') ? $total_all_loans : ($status_c
                             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                         </form>
                         <a href="?page=loan_requests" class="btn btn-sm btn-primary"><i class="bi bi-file-earmark-plus"></i> View Requests</a>
-                        <a href="?page=customers&show_inactive=1" class="btn btn-sm btn-success"><i class="bi bi-plus-lg"></i> New Loan Request</a>
+                        <a href="?page=loan_requests" class="btn btn-sm btn-success"><i class="bi bi-plus-lg"></i> New Loan Request</a>
                     </div>
                 </div>
                 <?php if ($filter_status !== 'all'): ?>
@@ -805,8 +805,17 @@ $filtered_loan_count = ($filter_status == 'all') ? $total_all_loans : ($status_c
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="8" class="text-center py-4">
-                                        <div class="text-muted">No loans found. <a href="?page=addloan">Add your first loan!</a></div>
+                                    <td colspan="8" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <div class="mb-3">
+                                                <i class="bi bi-wallet2" style="font-size: 4rem; color: #dee2e6;"></i>
+                                            </div>
+                                            <h5 class="text-dark fw-bold">No Loans Found</h5>
+                                            <p class="text-muted mb-4">It looks like you don't have any loans here. Start by evaluating a loan request!</p>
+                                            <a href="?page=loan_requests" class="btn btn-primary shadow-sm rounded-pill px-4 py-2 fw-bold">
+                                                <i class="bi bi-plus-circle me-2"></i> Go to Loan Requests
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endif; ?>
