@@ -223,13 +223,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_customer_id'])
                             <?php if (!empty($customers_array)): ?>
                                 <?php foreach ($customers_array as $index => $customer): ?>
                                 <?php
-                                    // GLS-0001 = bottom row (oldest/last in DESC order), increases upward
-                                    $gls_number = $total - $index;
-                                    $gls_label  = 'GLS-' . str_pad($gls_number, 4, '0', STR_PAD_LEFT);
+                                    // MNT-0001 = bottom row (oldest/last in DESC order), increases upward
+                                    $mnt_number = $total - $index;
+                                    $mnt_label  = 'MNT-' . str_pad($mnt_number, 4, '0', STR_PAD_LEFT);
                                 ?>
                                 <tr>
                                     <td>
-                                        <span class="badge gls-badge px-2 py-1 fw-bold"><?php echo $gls_label; ?></span>
+                                        <span class="badge mnt-badge px-2 py-1 fw-bold"><?php echo $mnt_label; ?></span>
                                     </td>
                                     <td><?php echo htmlspecialchars($customer['customer_code']); ?></td>
                                     <td><?php echo htmlspecialchars($customer['customer_name']); ?></td>
@@ -293,7 +293,7 @@ function confirmDelete(id, name) {
 .x-small { font-size: 11px; }
 .card { border-radius: 1rem; }
 .badge { border-radius: 2rem; }
-.gls-badge {
+.mnt-badge {
     background-color: #FF6B4A;
     color: #ffffff;
     font-size: 11px;
