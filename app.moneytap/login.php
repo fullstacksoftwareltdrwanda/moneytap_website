@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             font-family: 'Plus Jakarta Sans', sans-serif;
             overflow: hidden;
             background: #f8fafc; /* Professional light background */
-            font-size: 15px;
+            font-size: 14px;
         }
         
         .glass-panel {
@@ -91,12 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             background: rgba(255, 255, 255, 0.85); /* More opaque for light theme */
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            padding: 32px;
-            border-radius: 24px;
+            padding: 24px;
+            border-radius: 20px;
             border: 1px solid rgba(255, 255, 255, 0.5);
             color: #1e293b; /* Dark text for light panel */
             z-index: 10;
-            max-width: 380px;
+            max-width: 320px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
         
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             margin: 0;
             font-weight: 800;
             letter-spacing: 0.5px;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
         }
 
         .top-nav-link {
@@ -184,10 +184,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             max-width: 380px; /* Reduced from 440px */
         }
         .logo-box {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             background: linear-gradient(135deg, #00D094 0%, #6366F1 100%);
-            border-radius: 20px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -197,15 +197,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         .login-header h2 {
             font-weight: 800;
             color: #1e293b;
-            font-size: 2rem;
+            font-size: 1.7rem;
             margin-bottom: 8px;
             letter-spacing: -0.04em;
         }
         .login-header p {
             color: #94A3B8;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
             font-weight: 500;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
         .form-label {
             font-weight: 800;
@@ -217,11 +217,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         }
         .input-group {
             border: 1px solid #e2e8f0;
-            border-radius: 16px;
+            border-radius: 12px;
             transition: all 0.3s;
             background: #f8fafc;
             overflow: hidden;
-            padding: 2px;
+            padding: 1px;
         }
         .input-group:focus-within {
             border-color: var(--primary);
@@ -236,9 +236,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         }
         .form-control {
             border: none;
-            padding: 14px 20px;
+            padding: 10px 16px;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             background: transparent;
             color: #1e293b !important;
         }
@@ -253,8 +253,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             background: #0f172a; /* Solid dark blue for premium feel */
             color: #ffffff;
             border: none;
-            padding: 16px;
-            border-radius: 16px;
+            padding: 12px;
+            border-radius: 12px;
             font-weight: 800;
             width: 100%;
             margin-top: 10px;
@@ -268,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
             box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
         }
         .back-link {
-            margin-top: 32px;
+            margin-top: 24px;
             display: inline-flex;
             align-items: center;
             color: #64748B;
