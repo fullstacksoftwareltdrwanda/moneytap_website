@@ -4,11 +4,11 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     
-    # Base path for the app inside the website folder
-    RewriteBase /Certain_website/app.certain_company/
+    # Base path for the app
+    RewriteBase /app.moneytap/
 
     # 1. Redirect: strip .php if typed directly in browser
-    RewriteCond %{THE_REQUEST} \s/Certain_website/app\.certain_company/(.+?)\.php[\s?] [NC]
+    RewriteCond %{THE_REQUEST} \s/app\.moneytap/(.+?)\.php[\s?] [NC]
     RewriteRule ^ %1 [R=301,NE,L]
 
     # 2. Internally map clean URL to the .php file
