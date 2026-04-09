@@ -230,17 +230,15 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                                 </div>
                                 <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
                             <?php else: ?>
-                                <!-- Searchable Dropdown if no CID -->
-                                <select name="customer_id" id="customer_id_select"
-                                    class="form-select rounded-4 py-3 shadow-none border-2 border-primary-soft select2-active"
-                                    style="color: #000 !important; font-weight: 700 !important;" required>
-                                    <option value="" style="color: #000 !important;">Choose a member to study...</option>
+                                <!-- Standard form-select (Native Fallback) -->
+                                <select name="customer_id" class="form-select" required>
+                                    <option value="" disabled selected>-- Choose a member to study --</option>
                                     <?php
                                     $cust_sql = "SELECT customer_id, customer_name, customer_code FROM customers WHERE status = 'Approved' ORDER BY customer_name";
                                     $cust_res = $conn->query($cust_sql);
                                     while ($c = $cust_res->fetch_assoc()):
                                         ?>
-                                        <option value="<?php echo $c['customer_id']; ?>" style="color: #000 !important;">
+                                        <option value="<?php echo $c['customer_id']; ?>">
                                             <?php echo htmlspecialchars($c['customer_name']) . " (" . $c['customer_code'] . ")"; ?>
                                         </option>
                                     <?php endwhile; ?>
@@ -486,78 +484,17 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
         color-scheme: light !important;
     }
 
-    /* =====================================================================
-   SELECT2 — COMPLETE VISIBILITY FIX
-   Root cause: the rendered selected-value span inherits a white/light
-   color from dark-mode extensions or theme overrides. We target the
-   span at every possible specificity level, including the container
-   background, to guarantee a dark-on-white result.
-   ===================================================================== */
-
-    /* Force the entire Select2 container to a white background */
+    /* Select2 Custom Styling for Premium Look & Visibility */
     .select2-container--default .select2-selection--single {
         height: 60px !important;
-        background-color: #ffffff !important;
+        background-color: #fff !important;
         border: 2px solid #cfe2ff !important;
         border-radius: 1rem !important;
         padding: 12px !important;
         transition: all 0.2s;
     }
 
-    /* THE KEY FIX: the rendered value and placeholder spans */
-    .select2-container--default .select2-selection--single .select2-selection__rendered,
-    .select2-container--default .select2-selection--single .select2-selection__placeholder {
-        color: #000000 !important;
-        font-weight: 700 !important;
-        line-height: 34px !important;
-        background-color: #ffffff !important;
-        -webkit-text-fill-color: #000000 !important;
-        text-shadow: none !important;
-    }
-
-    /* Dropdown list items */
-    .select2-results__option {
-        color: #000000 !important;
-        font-weight: 500 !important;
-        background-color: #ffffff !important;
-        padding: 12px 20px !important;
-        -webkit-text-fill-color: #000000 !important;
-    }
-
-    /* Highlighted option in dropdown — white text is fine here */
-    .select2-results__option--highlighted[aria-selected],
-    .select2-results__option--highlighted {
-        background-color: #0d6efd !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-
-    /* Search box inside dropdown */
-    .select2-search__field {
-        color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important;
-        background-color: #ffffff !important;
-    }
-
-    /* Dropdown panel itself */
-    .select2-dropdown {
-        border-radius: 1rem !important;
-        border: 2px solid #cfe2ff !important;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
-        overflow: hidden;
-        background-color: #ffffff !important;
-    }
-
-    .select2-results {
-        background-color: #ffffff !important;
-    }
-
-    /* Arrow height */
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 58px !important;
-    }
-
-    /* BRUTE FORCE VISIBILITY FIX for other form elements */
+    /* BRUTE FORCE VISIBILITY FIX */
     #loanRequestForm .form-label,
     #loanRequestForm label,
     #loanRequestForm .fw-bold,
@@ -566,7 +503,18 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
     #loanRequestForm .form-control,
     #loanRequestForm .form-select,
     #loanRequestForm select,
-    #loanRequestForm option {
+    #loanRequestForm option,
+    /* Force black text for all select2 elements */
+    .select2-container .select2-selection__rendered,
+    .select2-container .select2-selection__rendered *,
+    .select2-container .select2-selection__placeholder,
+    .select2-container .select2-selection__placeholder *,
+    span.select2-selection__rendered,
+    span.select2-selection__placeholder,
+    .select2-selection__rendered,
+    .select2-selection__placeholder,
+    .select2-results__option,
+    .select2-search__field {
         color: #000000 !important;
         font-weight: 700 !important;
         text-shadow: none !important;
@@ -579,6 +527,39 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 
     #loanRequestForm .avatar-sm {
         color: #ffffff !important;
+    }
+
+    /* Select2 Specifics */
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #000000 !important;
+        font-weight: 700 !important;
+        line-height: 34px !important;
+    }
+
+    .select2-container--default .select2-selection--single {
+        background-color: #ffffff !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 58px !important;
+    }
+
+    .select2-dropdown {
+        border-radius: 1rem !important;
+        border: 2px solid #cfe2ff !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
+        overflow: hidden;
+    }
+
+    .select2-results__option {
+        padding: 12px 20px !important;
+        font-weight: 500 !important;
+    }
+
+    .select2-results__option--highlighted[aria-selected] {
+        background-color: #0d6efd !important;
+        color: #fff !important;
+        /* White text looks better when highlighted */
     }
 </style>
 
@@ -673,49 +654,29 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
         this.setSelectionRange(cursor + diff, cursor + diff);
     });
 
-    // =====================================================================
-    // SELECT2 COLOR FIX — applied on DOM ready AND on every Select2 event
-    // This is the reliable fix: hook into Select2's own lifecycle events
-    // so we force the color immediately after Select2 re-renders its span,
-    // not 300ms later via a polling interval.
-    // =====================================================================
-    function forceSelect2TextColor() {
-        // Target the rendered value span directly
-        document.querySelectorAll('.select2-selection__rendered, .select2-selection__placeholder').forEach(function (el) {
-            el.style.setProperty('color', '#000000', 'important');
-            el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
-            el.style.setProperty('background-color', '#ffffff', 'important');
-        });
-        // Also target the container background
-        document.querySelectorAll('.select2-selection--single').forEach(function (el) {
-            el.style.setProperty('background-color', '#ffffff', 'important');
-        });
-    }
-
-    // Run once on page load
-    document.addEventListener('DOMContentLoaded', function () {
-        forceSelect2TextColor();
-
-        // Hook into Select2 jQuery events if jQuery + Select2 are present
-        if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
-            // Initialize Select2 on the customer dropdown
-            $('#customer_id_select').select2({
-                placeholder: "Choose a member to study...",
-                allowClear: true,
-                width: '100%',
-                dropdownCssClass: 'select2-dropdown-custom',
-                selectionCssClass: 'select2-selection-custom'
+    // Failsafe for visibility in Edge/Chrome with Dark Mode extensions
+    setInterval(() => {
+        const selectors = [
+            '#loanRequestForm select',
+            '#loanRequestForm .form-select',
+            '#loanRequestForm label',
+            '#loanRequestForm .fw-bold',
+            '.select2-selection__rendered',
+            '.select2-selection__placeholder',
+            '.select2-results__option',
+            '[id^="select2-customer_id-"]'
+        ];
+        selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                el.style.color = '#000000';
+                el.style.setProperty('color', '#000000', 'important');
+                el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
+                // Check children
+                Array.from(el.children).forEach(child => {
+                    child.style.color = '#000000';
+                    child.style.setProperty('color', '#000000', 'important');
+                });
             });
-
-            // THE KEY: re-apply color immediately after Select2 updates the DOM
-            $('#customer_id_select').on('select2:select select2:unselect select2:open select2:close', function () {
-                // Small timeout to let Select2 finish re-rendering its span
-                setTimeout(forceSelect2TextColor, 10);
-            });
-        }
-    });
-
-    // Reduced-frequency failsafe (backup only — every 1s instead of 300ms)
-    // This catches any edge cases from browser extensions re-injecting styles
-    setInterval(forceSelect2TextColor, 1000);
+        });
+    }, 300);
 </script>
