@@ -379,7 +379,9 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 #loanRequestForm option,
 /* Force black text for all select2 elements */
 .select2-container .select2-selection__rendered,
+.select2-container .select2-selection__rendered *,
 .select2-container .select2-selection__placeholder,
+.select2-container .select2-selection__placeholder *,
 span.select2-selection__rendered,
 span.select2-selection__placeholder,
 .select2-selection__rendered,
@@ -527,13 +529,21 @@ setInterval(() => {
         '#loanRequestForm label', 
         '#loanRequestForm .fw-bold',
         '.select2-selection__rendered',
-        '.select2-results__option'
+        '.select2-selection__placeholder',
+        '.select2-results__option',
+        '[id^="select2-customer_id-"]'
     ];
     selectors.forEach(sel => {
         document.querySelectorAll(sel).forEach(el => {
             el.style.color = '#000000';
             el.style.setProperty('color', '#000000', 'important');
+            el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
+            // Check children
+            Array.from(el.children).forEach(child => {
+                child.style.color = '#000000';
+                child.style.setProperty('color', '#000000', 'important');
+            });
         });
     });
-}, 500);
+}, 300);
 </script>
