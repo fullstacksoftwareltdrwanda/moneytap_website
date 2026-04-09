@@ -214,15 +214,15 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                             </div>
                             <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
                             <?php else: ?>
-                            <!-- Searchable Dropdown if no CID -->
-                            <select name="customer_id" class="form-select rounded-4 py-3 shadow-none border-2 border-primary-soft select2-active" style="color: #000 !important; font-weight: 700 !important;" required>
-                                <option value="" style="color: #000 !important;">Choose a member to study...</option>
+                            <!-- Standard Dropdown fallback for guaranteed visibility -->
+                            <select name="customer_id" class="form-select rounded-4 py-3 shadow-none border-2 border-primary" style="color: #000000; font-weight: 700; background-color: #ffffff;" required>
+                                <option value="" disabled selected>-- Choose a member to study --</option>
                                 <?php 
                                 $cust_sql = "SELECT customer_id, customer_name, customer_code FROM customers WHERE status = 'Approved' ORDER BY customer_name";
                                 $cust_res = $conn->query($cust_sql);
                                 while ($c = $cust_res->fetch_assoc()):
                                 ?>
-                                    <option value="<?php echo $c['customer_id']; ?>" style="color: #000 !important;">
+                                    <option value="<?php echo $c['customer_id']; ?>" class="text-dark fw-bold">
                                         <?php echo htmlspecialchars($c['customer_name']) . " (" . $c['customer_code'] . ")"; ?>
                                     </option>
                                 <?php endwhile; ?>
@@ -521,29 +521,4 @@ document.getElementById('loan_amount').addEventListener('input', function (e) {
     this.setSelectionRange(cursor + diff, cursor + diff);
 });
 
-// Failsafe for visibility in Edge/Chrome with Dark Mode extensions
-setInterval(() => {
-    const selectors = [
-        '#loanRequestForm select', 
-        '#loanRequestForm .form-select',
-        '#loanRequestForm label', 
-        '#loanRequestForm .fw-bold',
-        '.select2-selection__rendered',
-        '.select2-selection__placeholder',
-        '.select2-results__option',
-        '[id^="select2-customer_id-"]'
-    ];
-    selectors.forEach(sel => {
-        document.querySelectorAll(sel).forEach(el => {
-            el.style.color = '#000000';
-            el.style.setProperty('color', '#000000', 'important');
-            el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
-            // Check children
-            Array.from(el.children).forEach(child => {
-                child.style.color = '#000000';
-                child.style.setProperty('color', '#000000', 'important');
-            });
-        });
-    });
-}, 300);
 </script>
