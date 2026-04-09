@@ -97,36 +97,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
                 require_once __DIR__ . '/../includes/approval_helper.php';
                 $p_date = date('Y-m-d');
                 $narration = "Processing Fee (2%) - Req #" . $new_request_id;
-                
-                // 1. Credit Full Fee Income (4203)
-                $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
-                _helper_createLedgerEntry($conn, [
-                    'transaction_date' => $p_date,
-                    'class' => 'Fee Income',
-                    'account_code' => '4203',
-                    'account_name' => 'Requested Amount Income (2%)',
-                    'particular' => 'Total Processing Fee Recognized',
-                    'voucher_number' => 'REQ-' . $new_request_id,
-                    'narration' => $narration,
-                    'beginning_balance' => $r_inc_beg,
-                    'debit_amount' => 0,
-                    'credit_amount' => $req_amt,
-                    'movement' => $req_amt,
-                    'ending_balance' => $r_inc_beg + $req_amt,
-                    'reference_type' => 'loan_request_fee',
-                    'reference_id' => $new_request_id,
-                    'created_by' => $_SESSION['user_id'] ?? 1
-                ]);
-
-                // 2. Debit Cash (1101) for the part paid now
+                // ONLY record manual ledger entries if cash was ACTUALLY paid upfront
                 if ($req_paid > 0) {
                     $c_beg = _helper_getBeginningBalance($conn, '1101', $p_date);
+                    // 1. Debit Cash (1101) for the part paid now
                     _helper_createLedgerEntry($conn, [
                         'transaction_date' => $p_date,
                         'class' => 'Assets',
                         'account_code' => '1101',
                         'account_name' => 'Cash on Hand',
-                        'particular' => 'Processing Fee (Partial Upfront)',
+                        'particular' => 'Processing Fee (Upfront Payment)',
                         'voucher_number' => 'REQ-' . $new_request_id,
                         'narration' => $narration,
                         'beginning_balance' => $c_beg,
@@ -138,32 +118,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
                         'reference_id' => $new_request_id,
                         'created_by' => $_SESSION['user_id'] ?? 1
                     ]);
-                }
 
-                // 3. Debit Receivable (1202) for the part remaining
-                $req_rem = $req_amt - $req_paid;
-                error_log("DEBUG REQ: amt=$req_amt, paid=$req_paid, rem=$req_rem");
-                if ($req_rem > 0) {
-                    $rec_beg = _helper_getBeginningBalance($conn, '1202', $p_date);
+                    // 2. Credit Fee Income (4203) ONLY for the part actually paid
+                    $r_inc_beg = _helper_getBeginningBalance($conn, '4203', $p_date);
                     _helper_createLedgerEntry($conn, [
                         'transaction_date' => $p_date,
-                        'class' => 'Assets',
-                        'account_code' => '1202',
-                        'account_name' => 'Requested Amount Receivable',
-                        'particular' => 'Processing Fee (To be collected)',
+                        'class' => 'Fee Income',
+                        'account_code' => '4203',
+                        'account_name' => 'Requested Amount Income (2%)',
+                        'particular' => 'Processing Fee Recognized (Upfront)',
                         'voucher_number' => 'REQ-' . $new_request_id,
                         'narration' => $narration,
-                        'beginning_balance' => $rec_beg,
-                        'debit_amount' => $req_rem,
-                        'credit_amount' => 0,
-                        'movement' => $req_rem,
-                        'ending_balance' => $rec_beg + $req_rem,
+                        'beginning_balance' => $r_inc_beg,
+                        'debit_amount' => 0,
+                        'credit_amount' => $req_paid,
+                        'movement' => $req_paid,
+                        'ending_balance' => $r_inc_beg + $req_paid,
                         'reference_type' => 'loan_request_fee',
                         'reference_id' => $new_request_id,
                         'created_by' => $_SESSION['user_id'] ?? 1
                     ]);
                 }
-            }
 
             $success_message = "Loan request submitted successfully for review!";
             echo "<script>setTimeout(() => window.location.href='?page=loan_requests', 2000);</script>";
