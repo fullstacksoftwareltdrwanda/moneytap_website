@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 $conn = getConnection();
-if (!$conn) die("Database connection failed");
+if (!$conn)
+    die("Database connection failed");
 
 // Auto-initialize table if missing
 $conn->query("CREATE TABLE IF NOT EXISTS loan_requests (
@@ -26,11 +27,13 @@ $conn->query("CREATE TABLE IF NOT EXISTS loan_requests (
 // Ensure partial payment column exists
 $conn->query("ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS requested_amount_paid DECIMAL(15, 2) DEFAULT 0.00");
 
-function parseMoney($moneyString) {
+function parseMoney($moneyString)
+{
     return floatval(str_replace(',', '', $moneyString));
 }
 
-function formatMoney($amount, $decimals = 0) {
+function formatMoney($amount, $decimals = 0)
+{
     return number_format($amount, $decimals, '.', ',');
 }
 
@@ -65,10 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
     $mgmt_r = floatval($_POST['mgmt_fee_rate']);
     $deduct_f = isset($_POST['deduct_fee']) ? 1 : 0;
     $mgmt_first = isset($_POST['mgmt_first_month']) ? 1 : 0;
-    
+
     $req_amt = parseMoney($_POST['requested_amount_fee']);
     $req_paid = parseMoney($_POST['req_amt_paid'] ?? '0');
-    
+
     // VALIDATION: Prevent overpayment
     if ($req_paid > $req_amt) {
         $error_message = "Error: Amount paid upfront (FRW " . formatMoney($req_paid) . ") cannot exceed the total fee (FRW " . formatMoney($req_amt) . ").";
@@ -76,10 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
     }
 
     $is_paid_fully = ($req_paid >= $req_amt) ? 1 : 0;
-    $total_d = $amt; 
-    
+    $total_d = $amt;
+
     if ($cid <= 0 || $amt <= 0) {
-        if (!$error_message) $error_message = "Please select a member and enter a valid loan amount.";
+        if (!$error_message)
+            $error_message = "Please select a member and enter a valid loan amount.";
     } else {
         $prep = "INSERT INTO loan_requests (customer_id, loan_amount, total_disbursed, interest_rate, number_of_instalments, 
                                          management_fee_rate, deduct_fee_from_disbursed, mgmt_fee_first_month_only, 
@@ -87,11 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')";
         $stmt = $conn->prepare($prep);
         $stmt->bind_param("idddidddddi", $cid, $amt, $total_d, $rate, $inst, $mgmt_r, $deduct_f, $mgmt_first, $req_amt, $req_paid, $is_paid_fully);
-        
-        
+
+
         if ($stmt->execute()) {
             $new_request_id = $conn->insert_id;
-            
+
             // --- IMMEDIATE LEDGER RECORDING for full 2% Processing Fee ---
             if ($req_amt > 0) {
                 require_once __DIR__ . '/../includes/approval_helper.php';
@@ -156,7 +160,8 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 <div class="row mb-4 animate-in">
     <div class="col-12 py-3 d-flex justify-content-between align-items-center">
         <div>
-            <h2 class="h4 fw-bold text-primary mb-1"><i class="bi bi-file-earmark-plus-fill me-2"></i> Create Loan Request</h2>
+            <h2 class="h4 fw-bold text-primary mb-1"><i class="bi bi-file-earmark-plus-fill me-2"></i> Create Loan
+                Request</h2>
             <p class="text-muted small">Enter the loan parameters for review and assessment.</p>
         </div>
         <a href="?page=customers" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
@@ -167,13 +172,15 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 
 <?php if ($success_message): ?>
     <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i> <?php echo $success_message; ?>
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <?php echo $success_message; ?>
     </div>
 <?php endif; ?>
 
 <?php if ($error_message): ?>
     <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?php echo $error_message; ?>
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <?php echo $error_message; ?>
     </div>
 <?php endif; ?>
 
@@ -187,7 +194,8 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                     </div>
                     <div>
                         <h5 class="mb-0 fw-bold">Loan Study & Parameters</h5>
-                        <p class="mb-0 opacity-75 small uppercase tracking-wider">Fill in the details for risk assessment</p>
+                        <p class="mb-0 opacity-75 small uppercase tracking-wider">Fill in the details for risk
+                            assessment</p>
                     </div>
                 </div>
             </div>
@@ -201,32 +209,42 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                                 <span class="text-primary small">Locked for security</span>
                             </label>
                             <?php if ($customer_id > 0): ?>
-                            <!-- Pre-selected Customer View -->
-                            <div class="p-3 bg-light rounded-4 border-dashed d-flex align-items-center justify-content-between" style="color: #000 !important;">
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-sm bg-primary text-white me-3"><?php echo strtoupper(substr($customer_name, 0, 1) ?: 'C'); ?></div>
-                                    <div>
-                                        <div class="fw-bold fs-5" style="color: #000 !important;"><?php echo htmlspecialchars($customer_name); ?></div>
-                                        <div class="text-muted x-small">ID #<?php echo $customer_id; ?></div>
+                                <!-- Pre-selected Customer View -->
+                                <div class="p-3 bg-light rounded-4 border-dashed d-flex align-items-center justify-content-between"
+                                    style="color: #000 !important;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-primary text-white me-3">
+                                            <?php echo strtoupper(substr($customer_name, 0, 1) ?: 'C'); ?>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold fs-5" style="color: #000 !important;">
+                                                <?php echo htmlspecialchars($customer_name); ?>
+                                            </div>
+                                            <div class="text-muted x-small">ID #
+                                                <?php echo $customer_id; ?>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <a href="?page=add_loan_request"
+                                        class="btn btn-sm btn-outline-secondary rounded-pill">Change</a>
                                 </div>
-                                <a href="?page=add_loan_request" class="btn btn-sm btn-outline-secondary rounded-pill">Change</a>
-                            </div>
-                            <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
+                                <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
                             <?php else: ?>
-                            <!-- Standard Dropdown fallback for guaranteed visibility -->
-                            <select name="customer_id" class="form-select rounded-4 py-3 shadow-none border-2 border-primary" style="color: #000000; font-weight: 700; background-color: #ffffff;" required>
-                                <option value="" disabled selected>-- Choose a member to study --</option>
-                                <?php 
-                                $cust_sql = "SELECT customer_id, customer_name, customer_code FROM customers WHERE status = 'Approved' ORDER BY customer_name";
-                                $cust_res = $conn->query($cust_sql);
-                                while ($c = $cust_res->fetch_assoc()):
-                                ?>
-                                    <option value="<?php echo $c['customer_id']; ?>" class="text-dark fw-bold">
-                                        <?php echo htmlspecialchars($c['customer_name']) . " (" . $c['customer_code'] . ")"; ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
+                                <!-- Searchable Dropdown if no CID -->
+                                <select name="customer_id" id="customer_id_select"
+                                    class="form-select rounded-4 py-3 shadow-none border-2 border-primary-soft select2-active"
+                                    style="color: #000 !important; font-weight: 700 !important;" required>
+                                    <option value="" style="color: #000 !important;">Choose a member to study...</option>
+                                    <?php
+                                    $cust_sql = "SELECT customer_id, customer_name, customer_code FROM customers WHERE status = 'Approved' ORDER BY customer_name";
+                                    $cust_res = $conn->query($cust_sql);
+                                    while ($c = $cust_res->fetch_assoc()):
+                                        ?>
+                                        <option value="<?php echo $c['customer_id']; ?>" style="color: #000 !important;">
+                                            <?php echo htmlspecialchars($c['customer_name']) . " (" . $c['customer_code'] . ")"; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
                             <?php endif; ?>
                         </div>
 
@@ -234,45 +252,59 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                         <div class="col-md-6 mt-5">
                             <label class="form-label fw-bold text-dark">Loan Principal (RWF)</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white border-end-0 rounded-start-4 ps-3 py-3 text-muted">FRW</span>
-                                <input type="text" name="loan_amount" id="loan_amount" class="form-control border-start-0 rounded-end-4 py-3 fw-bold fs-5" placeholder="0.00" onkeyup="formatAndCalc()" value="<?php echo number_format($pre_requested_amount); ?>">
+                                <span
+                                    class="input-group-text bg-white border-end-0 rounded-start-4 ps-3 py-3 text-muted">FRW</span>
+                                <input type="text" name="loan_amount" id="loan_amount"
+                                    class="form-control border-start-0 rounded-end-4 py-3 fw-bold fs-5"
+                                    placeholder="0.00" onkeyup="formatAndCalc()"
+                                    value="<?php echo number_format($pre_requested_amount); ?>">
                             </div>
                         </div>
-                        
+
                         <div class="col-md-3 mt-5">
                             <label class="form-label fw-bold text-dark">Interest Rate (%)</label>
-                            <input type="number" step="0.01" name="interest_rate" class="form-control rounded-4 py-3 fw-bold" value="5.5">
+                            <input type="number" step="0.01" name="interest_rate"
+                                class="form-control rounded-4 py-3 fw-bold" value="5.5">
                         </div>
 
                         <div class="col-md-3 mt-5">
                             <label class="form-label fw-bold text-dark">Duration (Months)</label>
-                            <input type="number" name="duration" class="form-control rounded-4 py-3 fw-bold" value="<?php echo $pre_loan_duration; ?>">
+                            <input type="number" name="duration" class="form-control rounded-4 py-3 fw-bold"
+                                value="<?php echo $pre_loan_duration; ?>">
                         </div>
 
                         <!-- Fees Section Header -->
                         <div class="col-12 mt-5">
                             <div class="d-flex align-items-center">
                                 <hr class="flex-grow-1 op-20">
-                                <span class="px-3 small text-muted fw-bold uppercase tracking-wider">Management & Processing Fees</span>
+                                <span class="px-3 small text-muted fw-bold uppercase tracking-wider">Management &
+                                    Processing Fees</span>
                                 <hr class="flex-grow-1 op-20">
                             </div>
                         </div>
 
                         <div class="col-md-4 mt-4">
                             <label class="form-label fw-bold text-dark">Management Fee (%)</label>
-                            <input type="number" step="0.1" name="mgmt_fee_rate" id="mgmt_rate" class="form-control rounded-4 py-3" value="5.5" onchange="formatAndCalc()">
+                            <input type="number" step="0.1" name="mgmt_fee_rate" id="mgmt_rate"
+                                class="form-control rounded-4 py-3" value="5.5" onchange="formatAndCalc()">
                         </div>
 
                         <div class="col-md-8 mt-4">
                             <label class="form-label fw-bold text-dark opacity-0">Options</label>
                             <div class="d-flex gap-3 h-100 align-items-center">
-                                <div class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
-                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="deduct_fee" id="deduct_fee" checked>
-                                    <label class="form-check-label small fw-bold mt-1" for="deduct_fee">Deduct from Disbursed</label>
+                                <div
+                                    class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
+                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="deduct_fee"
+                                        id="deduct_fee" checked>
+                                    <label class="form-check-label small fw-bold mt-1" for="deduct_fee">Deduct from
+                                        Disbursed</label>
                                 </div>
-                                <div class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
-                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="mgmt_first_month" id="mgmt_first_month">
-                                    <label class="form-check-label small fw-bold mt-1" for="mgmt_first_month">First Month Only</label>
+                                <div
+                                    class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
+                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="mgmt_first_month"
+                                        id="mgmt_first_month">
+                                    <label class="form-check-label small fw-bold mt-1" for="mgmt_first_month">First
+                                        Month Only</label>
                                 </div>
                             </div>
                         </div>
@@ -282,25 +314,45 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                             <div class="p-4 bg-primary-soft rounded-5 border-2 border-dashed border-primary">
                                 <div class="row g-4 align-items-center">
                                     <div class="col-md-4">
-                                        <label class="form-label fw-black text-primary uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Total 2% Fee (Calculated)</label>
+                                        <label class="form-label fw-black text-primary uppercase"
+                                            style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Total
+                                            2% Fee (Calculated)</label>
                                         <div class="input-group">
-                                            <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-primary"><i class="bi bi-tag-fill"></i></span>
-                                            <input type="text" name="requested_amount_fee" id="requested_amount_fee" class="form-control border-0 rounded-end-4 py-3 fw-black text-primary fs-5 shadow-sm" style="color: #0d6efd !important;" readonly>
+                                            <span
+                                                class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-primary"><i
+                                                    class="bi bi-tag-fill"></i></span>
+                                            <input type="text" name="requested_amount_fee" id="requested_amount_fee"
+                                                class="form-control border-0 rounded-end-4 py-3 fw-black text-primary fs-5 shadow-sm"
+                                                style="color: #0d6efd !important;" readonly>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-black text-success uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Amount Paid Upfront</label>
+                                        <label class="form-label fw-black text-success uppercase"
+                                            style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Amount
+                                            Paid Upfront</label>
                                         <div class="input-group">
-                                            <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-success"><i class="bi bi-cash-stack"></i></span>
-                                            <input type="text" name="req_amt_paid" id="req_amt_paid" class="form-control border-0 rounded-end-4 py-3 fw-black text-success fs-5 shadow-sm" style="color: #198754 !important;" placeholder="0" onkeyup="formatMoneyInput(this); updateSummary()">
+                                            <span
+                                                class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-success"><i
+                                                    class="bi bi-cash-stack"></i></span>
+                                            <input type="text" name="req_amt_paid" id="req_amt_paid"
+                                                class="form-control border-0 rounded-end-4 py-3 fw-black text-success fs-5 shadow-sm"
+                                                style="color: #198754 !important;" placeholder="0"
+                                                onkeyup="formatMoneyInput(this); updateSummary()">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-black text-danger uppercase" style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Remaining to Loan</label>
+                                        <label class="form-label fw-black text-danger uppercase"
+                                            style="font-size: 0.7rem; letter-spacing: 1px; color: #000 !important;">Remaining
+                                            to Loan</label>
                                         <div class="input-group">
-                                            <span class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-danger"><i class="bi bi-plus-circle"></i></span>
-                                            <input type="text" id="req_amt_remaining" class="form-control border-0 rounded-end-4 py-3 fw-black text-danger fs-5 shadow-sm bg-light" style="color: #dc3545 !important;" readonly placeholder="0">
-                                            <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="0">
+                                            <span
+                                                class="input-group-text bg-white border-0 rounded-start-4 ps-3 py-3 text-danger"><i
+                                                    class="bi bi-plus-circle"></i></span>
+                                            <input type="text" id="req_amt_remaining"
+                                                class="form-control border-0 rounded-end-4 py-3 fw-black text-danger fs-5 shadow-sm bg-light"
+                                                style="color: #dc3545 !important;" readonly placeholder="0">
+                                            <input type="hidden" name="is_requested_paid_upfront"
+                                                id="is_requested_paid_upfront" value="0">
                                         </div>
                                     </div>
                                 </div>
@@ -309,20 +361,25 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 
                         <!-- Summary Reveal -->
                         <div class="col-12 mt-5 animate-slide-up" id="summaryBox" style="display:none;">
-                            <div class="p-4 rounded-5 bg-dark text-white shadow-lg d-flex justify-content-between align-items-center">
+                            <div
+                                class="p-4 rounded-5 bg-dark text-white shadow-lg d-flex justify-content-between align-items-center">
                                 <div>
-                                    <small class="text-white-50 uppercase tracking-widest fw-bold">Est. Total to Repay</small>
+                                    <small class="text-white-50 uppercase tracking-widest fw-bold">Est. Total to
+                                        Repay</small>
                                     <div class="h2 mb-0 fw-black text-brand-primary" id="totalRepayText">FRW 0</div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="small mb-1"><i class="bi bi-info-circle me-1"></i> Pre-Approval Simulation</div>
-                                    <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold" id="disburseBadge">Disbursed: FRW 0</span>
+                                    <div class="small mb-1"><i class="bi bi-info-circle me-1"></i> Pre-Approval
+                                        Simulation</div>
+                                    <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold"
+                                        id="disburseBadge">Disbursed: FRW 0</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="col-12 mt-5 text-center">
-                            <button type="submit" name="submit_request" class="btn btn-primary btn-xl rounded-pill px-5 py-3 fw-black shadow-lg hover-scale">
+                            <button type="submit" name="submit_request"
+                                class="btn btn-primary btn-xl rounded-pill px-5 py-3 fw-black shadow-lg hover-scale">
                                 <i class="bi bi-send-check me-2"></i> SUBMIT FOR STUDY
                             </button>
                         </div>
@@ -334,191 +391,331 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 </div>
 
 <style>
-.bg-gradient-primary { background: linear-gradient(135deg, #0d6efd 0%, #004dc7 100%); }
-.glass-card { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.95); }
-.shadow-premium { box-shadow: 0 40px 80px rgba(0,0,0,0.1) !important; }
-.bg-primary-soft { background-color: #f0f7ff; }
-.border-primary-soft { border-color: #cfe2ff; }
-.bg-success-soft { background-color: #e6f7ec; }
-.icon-box-white { width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 15px; display: flex; align-items: center; justify-content: center; }
-.avatar-sm { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-.card-style-check { cursor: pointer; transition: all 0.2s; }
-.card-style-check:hover { background-color: #fff !important; border-color: #0d6efd !important; }
-.fw-black { font-weight: 900 !important; }
-.btn-xl { font-size: 1.1rem; }
-.hover-scale { transition: transform 0.2s; }
-.hover-scale:hover { transform: translateY(-5px); }
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #0d6efd 0%, #004dc7 100%);
+    }
 
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.animate-in { animation: slideUp 0.4s ease-out; }
-.animate-slide-up { animation: slideUp 0.6s ease-out; }
+    .glass-card {
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.95);
+    }
 
-:root {
-    color-scheme: light !important;
-}
+    .shadow-premium {
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.1) !important;
+    }
 
-/* Select2 Custom Styling for Premium Look & Visibility */
-.select2-container--default .select2-selection--single {
-    height: 60px !important;
-    background-color: #fff !important;
-    border: 2px solid #cfe2ff !important;
-    border-radius: 1rem !important;
-    padding: 12px !important;
-    transition: all 0.2s;
-}
+    .bg-primary-soft {
+        background-color: #f0f7ff;
+    }
 
-/* BRUTE FORCE VISIBILITY FIX */
-#loanRequestForm .form-label, 
-#loanRequestForm label,
-#loanRequestForm .fw-bold, 
-#loanRequestForm .fw-black,
-#loanRequestForm .text-dark,
-#loanRequestForm .form-control,
-#loanRequestForm .form-select,
-#loanRequestForm select,
-#loanRequestForm option,
-/* Force black text for all select2 elements */
-.select2-container .select2-selection__rendered,
-.select2-container .select2-selection__rendered *,
-.select2-container .select2-selection__placeholder,
-.select2-container .select2-selection__placeholder *,
-span.select2-selection__rendered,
-span.select2-selection__placeholder,
-.select2-selection__rendered,
-.select2-selection__placeholder,
-.select2-results__option,
-.select2-search__field {
-    color: #000000 !important;
-    font-weight: 700 !important;
-    text-shadow: none !important;
-    -webkit-text-fill-color: #000000 !important;
-}
+    .border-primary-soft {
+        border-color: #cfe2ff;
+    }
 
-#loanRequestForm .text-muted {
-    color: #444444 !important;
-}
+    .bg-success-soft {
+        background-color: #e6f7ec;
+    }
 
-#loanRequestForm .avatar-sm {
-    color: #ffffff !important;
-}
+    .icon-box-white {
+        width: 50px;
+        height: 50px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-/* Select2 Specifics */
-.select2-container--default .select2-selection--single .select2-selection__rendered {
-    color: #000000 !important;
-    font-weight: 700 !important;
-    line-height: 34px !important;
-}
-.select2-container--default .select2-selection--single {
-    background-color: #ffffff !important;
-}
-.select2-container--default .select2-selection--single .select2-selection__arrow {
-    height: 58px !important;
-}
-.select2-dropdown {
-    border-radius: 1rem !important;
-    border: 2px solid #cfe2ff !important;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
-    overflow: hidden;
-}
-.select2-results__option {
-    padding: 12px 20px !important;
-    font-weight: 500 !important;
-}
-.select2-results__option--highlighted[aria-selected] {
-    background-color: #0d6efd !important;
-    color: #fff !important; /* White text looks better when highlighted */
-}
+    .avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .card-style-check {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .card-style-check:hover {
+        background-color: #fff !important;
+        border-color: #0d6efd !important;
+    }
+
+    .fw-black {
+        font-weight: 900 !important;
+    }
+
+    .btn-xl {
+        font-size: 1.1rem;
+    }
+
+    .hover-scale {
+        transition: transform 0.2s;
+    }
+
+    .hover-scale:hover {
+        transform: translateY(-5px);
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .animate-in {
+        animation: slideUp 0.4s ease-out;
+    }
+
+    .animate-slide-up {
+        animation: slideUp 0.6s ease-out;
+    }
+
+    :root {
+        color-scheme: light !important;
+    }
+
+    /* =====================================================================
+   SELECT2 — COMPLETE VISIBILITY FIX
+   Root cause: the rendered selected-value span inherits a white/light
+   color from dark-mode extensions or theme overrides. We target the
+   span at every possible specificity level, including the container
+   background, to guarantee a dark-on-white result.
+   ===================================================================== */
+
+    /* Force the entire Select2 container to a white background */
+    .select2-container--default .select2-selection--single {
+        height: 60px !important;
+        background-color: #ffffff !important;
+        border: 2px solid #cfe2ff !important;
+        border-radius: 1rem !important;
+        padding: 12px !important;
+        transition: all 0.2s;
+    }
+
+    /* THE KEY FIX: the rendered value and placeholder spans */
+    .select2-container--default .select2-selection--single .select2-selection__rendered,
+    .select2-container--default .select2-selection--single .select2-selection__placeholder {
+        color: #000000 !important;
+        font-weight: 700 !important;
+        line-height: 34px !important;
+        background-color: #ffffff !important;
+        -webkit-text-fill-color: #000000 !important;
+        text-shadow: none !important;
+    }
+
+    /* Dropdown list items */
+    .select2-results__option {
+        color: #000000 !important;
+        font-weight: 500 !important;
+        background-color: #ffffff !important;
+        padding: 12px 20px !important;
+        -webkit-text-fill-color: #000000 !important;
+    }
+
+    /* Highlighted option in dropdown — white text is fine here */
+    .select2-results__option--highlighted[aria-selected],
+    .select2-results__option--highlighted {
+        background-color: #0d6efd !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* Search box inside dropdown */
+    .select2-search__field {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+
+    /* Dropdown panel itself */
+    .select2-dropdown {
+        border-radius: 1rem !important;
+        border: 2px solid #cfe2ff !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
+        overflow: hidden;
+        background-color: #ffffff !important;
+    }
+
+    .select2-results {
+        background-color: #ffffff !important;
+    }
+
+    /* Arrow height */
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 58px !important;
+    }
+
+    /* BRUTE FORCE VISIBILITY FIX for other form elements */
+    #loanRequestForm .form-label,
+    #loanRequestForm label,
+    #loanRequestForm .fw-bold,
+    #loanRequestForm .fw-black,
+    #loanRequestForm .text-dark,
+    #loanRequestForm .form-control,
+    #loanRequestForm .form-select,
+    #loanRequestForm select,
+    #loanRequestForm option {
+        color: #000000 !important;
+        font-weight: 700 !important;
+        text-shadow: none !important;
+        -webkit-text-fill-color: #000000 !important;
+    }
+
+    #loanRequestForm .text-muted {
+        color: #444444 !important;
+    }
+
+    #loanRequestForm .avatar-sm {
+        color: #ffffff !important;
+    }
 </style>
 
 <script>
-function formatMoney(num) {
-    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function parseMoney(str) {
-    return parseFloat(str.replace(/,/g, '')) || 0;
-}
-
-function formatAndCalc() {
-    const input = document.getElementById('loan_amount');
-    let val = parseMoney(input.value);
-    if (isNaN(val)) val = 0;
-    
-    // Auto-calc Requested Amount (2%)
-    const reqField = document.getElementById('requested_amount_fee');
-    const reqAmt = Math.round(val * 0.02);
-    reqField.value = formatMoney(reqAmt);
-    
-    updateSummary();
-}
-
-function updateSummary() {
-    const amount = parseMoney(document.getElementById('loan_amount').value);
-    if (amount <= 0) {
-        document.getElementById('summaryBox').style.display = 'none';
-        return;
+    function formatMoney(num) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
-    
-    document.getElementById('summaryBox').style.display = 'block';
-    
-    const mgmtRate = parseFloat(document.getElementById('mgmt_rate').value) || 0;
-    const deductFee = document.getElementById('deduct_fee').checked;
-    
-    // Processing Fee (2%) Logic
-    const fullReqAmt = Math.round(amount * 0.02);
-    document.getElementById('requested_amount_fee').value = formatMoney(fullReqAmt);
-    
-    const reqPaidNow = parseMoney(document.getElementById('req_amt_paid').value);
-    
-    if (reqPaidNow > fullReqAmt) {
-        alert("The amount paid upfront cannot be greater than the required 2% fee (FRW " + formatMoney(fullReqAmt) + ")");
-        document.getElementById('req_amt_paid').value = formatMoney(fullReqAmt);
+
+    function parseMoney(str) {
+        return parseFloat(str.replace(/,/g, '')) || 0;
+    }
+
+    function formatAndCalc() {
+        const input = document.getElementById('loan_amount');
+        let val = parseMoney(input.value);
+        if (isNaN(val)) val = 0;
+
+        // Auto-calc Requested Amount (2%)
+        const reqField = document.getElementById('requested_amount_fee');
+        const reqAmt = Math.round(val * 0.02);
+        reqField.value = formatMoney(reqAmt);
+
         updateSummary();
-        return;
     }
-    
-    const remaining = Math.max(0, fullReqAmt - reqPaidNow);
-    document.getElementById('req_amt_remaining').value = formatMoney(remaining);
-    
-    // Set internal flag for "Upfront" (1 if fully paid)
-    document.getElementById('is_requested_paid_upfront').value = (reqPaidNow >= fullReqAmt) ? '1' : '0';
-    
-    let disbursed = amount;
-    if (deductFee) {
-        disbursed -= (amount * (mgmtRate / 100));
-    }
-    
-    document.getElementById('totalRepayText').innerText = 'FRW ' + formatMoney(amount);
-    document.getElementById('disburseBadge').innerText = 'Disbursed: FRW ' + formatMoney(disbursed);
-}
 
-function formatMoneyInput(el) {
-    let cursor = el.selectionStart;
-    let oldVal = el.value;
-    let val = parseMoney(el.value);
-    if (isNaN(val)) {
-        el.value = '';
-        return;
-    }
-    el.value = formatMoney(val);
-    let diff = el.value.length - oldVal.length;
-    el.setSelectionRange(cursor + diff, cursor + diff);
-}
+    function updateSummary() {
+        const amount = parseMoney(document.getElementById('loan_amount').value);
+        if (amount <= 0) {
+            document.getElementById('summaryBox').style.display = 'none';
+            return;
+        }
 
-// Input formatting for loan_amount
-document.getElementById('loan_amount').addEventListener('input', function (e) {
-    let cursor = this.selectionStart;
-    let oldVal = this.value;
-    let val = parseMoney(this.value);
-    if (isNaN(val)) {
-        this.value = '';
-        return;
-    }
-    this.value = formatMoney(val);
-    
-    // Adjust cursor position
-    let diff = this.value.length - oldVal.length;
-    this.setSelectionRange(cursor + diff, cursor + diff);
-});
+        document.getElementById('summaryBox').style.display = 'block';
 
+        const mgmtRate = parseFloat(document.getElementById('mgmt_rate').value) || 0;
+        const deductFee = document.getElementById('deduct_fee').checked;
+
+        // Processing Fee (2%) Logic
+        const fullReqAmt = Math.round(amount * 0.02);
+        document.getElementById('requested_amount_fee').value = formatMoney(fullReqAmt);
+
+        const reqPaidNow = parseMoney(document.getElementById('req_amt_paid').value);
+
+        if (reqPaidNow > fullReqAmt) {
+            alert("The amount paid upfront cannot be greater than the required 2% fee (FRW " + formatMoney(fullReqAmt) + ")");
+            document.getElementById('req_amt_paid').value = formatMoney(fullReqAmt);
+            updateSummary();
+            return;
+        }
+
+        const remaining = Math.max(0, fullReqAmt - reqPaidNow);
+        document.getElementById('req_amt_remaining').value = formatMoney(remaining);
+
+        // Set internal flag for "Upfront" (1 if fully paid)
+        document.getElementById('is_requested_paid_upfront').value = (reqPaidNow >= fullReqAmt) ? '1' : '0';
+
+        let disbursed = amount;
+        if (deductFee) {
+            disbursed -= (amount * (mgmtRate / 100));
+        }
+
+        document.getElementById('totalRepayText').innerText = 'FRW ' + formatMoney(amount);
+        document.getElementById('disburseBadge').innerText = 'Disbursed: FRW ' + formatMoney(disbursed);
+    }
+
+    function formatMoneyInput(el) {
+        let cursor = el.selectionStart;
+        let oldVal = el.value;
+        let val = parseMoney(el.value);
+        if (isNaN(val)) {
+            el.value = '';
+            return;
+        }
+        el.value = formatMoney(val);
+        let diff = el.value.length - oldVal.length;
+        el.setSelectionRange(cursor + diff, cursor + diff);
+    }
+
+    // Input formatting for loan_amount
+    document.getElementById('loan_amount').addEventListener('input', function (e) {
+        let cursor = this.selectionStart;
+        let oldVal = this.value;
+        let val = parseMoney(this.value);
+        if (isNaN(val)) {
+            this.value = '';
+            return;
+        }
+        this.value = formatMoney(val);
+
+        // Adjust cursor position
+        let diff = this.value.length - oldVal.length;
+        this.setSelectionRange(cursor + diff, cursor + diff);
+    });
+
+    // =====================================================================
+    // SELECT2 COLOR FIX — applied on DOM ready AND on every Select2 event
+    // This is the reliable fix: hook into Select2's own lifecycle events
+    // so we force the color immediately after Select2 re-renders its span,
+    // not 300ms later via a polling interval.
+    // =====================================================================
+    function forceSelect2TextColor() {
+        // Target the rendered value span directly
+        document.querySelectorAll('.select2-selection__rendered, .select2-selection__placeholder').forEach(function (el) {
+            el.style.setProperty('color', '#000000', 'important');
+            el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
+            el.style.setProperty('background-color', '#ffffff', 'important');
+        });
+        // Also target the container background
+        document.querySelectorAll('.select2-selection--single').forEach(function (el) {
+            el.style.setProperty('background-color', '#ffffff', 'important');
+        });
+    }
+
+    // Run once on page load
+    document.addEventListener('DOMContentLoaded', function () {
+        forceSelect2TextColor();
+
+        // Hook into Select2 jQuery events if jQuery + Select2 are present
+        if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+            // Initialize Select2 on the customer dropdown
+            $('#customer_id_select').select2({
+                placeholder: "Choose a member to study...",
+                allowClear: true,
+                width: '100%',
+                dropdownCssClass: 'select2-dropdown-custom',
+                selectionCssClass: 'select2-selection-custom'
+            });
+
+            // THE KEY: re-apply color immediately after Select2 updates the DOM
+            $('#customer_id_select').on('select2:select select2:unselect select2:open select2:close', function () {
+                // Small timeout to let Select2 finish re-rendering its span
+                setTimeout(forceSelect2TextColor, 10);
+            });
+        }
+    });
+
+    // Reduced-frequency failsafe (backup only — every 1s instead of 300ms)
+    // This catches any edge cases from browser extensions re-injecting styles
+    setInterval(forceSelect2TextColor, 1000);
 </script>
