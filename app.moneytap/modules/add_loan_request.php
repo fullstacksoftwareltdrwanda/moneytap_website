@@ -377,6 +377,9 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 #loanRequestForm .form-select,
 #loanRequestForm select,
 #loanRequestForm option,
+/* Force black text for all select2 elements */
+.select2-container .select2-selection__rendered,
+span.select2-selection__rendered,
 .select2-selection__rendered,
 .select2-results__option,
 .select2-search__field {
@@ -399,6 +402,9 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
     color: #000000 !important;
     font-weight: 700 !important;
     line-height: 34px !important;
+}
+.select2-container--default .select2-selection--single {
+    background-color: #ffffff !important;
 }
 .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 58px !important;
