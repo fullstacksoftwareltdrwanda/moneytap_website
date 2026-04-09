@@ -381,6 +381,8 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 .select2-results__option,
 .select2-search__field {
     color: #000000 !important;
+    font-weight: 700 !important;
+    text-shadow: none !important;
     -webkit-text-fill-color: #000000 !important;
 }
 
@@ -394,6 +396,7 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 
 /* Select2 Specifics */
 .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #000000 !important;
     font-weight: 700 !important;
     line-height: 34px !important;
 }
