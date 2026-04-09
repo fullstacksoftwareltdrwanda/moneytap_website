@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
                         'created_by' => $_SESSION['user_id'] ?? 1
                     ]);
                 }
-
+            }
             $success_message = "Loan request submitted successfully for review!";
             echo "<script>setTimeout(() => window.location.href='?page=loan_requests', 2000);</script>";
         } else {
