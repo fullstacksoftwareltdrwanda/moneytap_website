@@ -94,7 +94,8 @@ function executeApproval($conn, $approval) {
                 customer_code, customer_name, birth_place, id_number, account_number,
                 occupation, gender, date_of_birth, record_date, phone, email,
                 organization, father_name, mother_name, marriage_type, spouse,
-                spouse_id, spouse_occupation, spouse_phone, address, location,
+                spouse_id, spouse_occupation, spouse_phone, address, 
+                province, district, sector, cell, village, location,
                 project, project_location, caution_location, loan_type, created_by,
                 has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
                 collateral_type, collateral_sub_type, upi_location, square_mtrs,
@@ -102,18 +103,19 @@ function executeApproval($conn, $approval) {
                 requested_amount, loan_duration,
                 created_at, updated_at, is_active, status
             ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
             )";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
             $d = $data;
-            $stmt->bind_param('ssssssssssssssssssssssssssssssssssssssss',
+            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssssssssss',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['record_date'], $d['phone'], $d['email'], $d['organization'],
                 $d['father_name'], $d['mother_name'], $d['marriage_type'], $d['spouse'],
                 $d['spouse_id'], $d['spouse_occupation'], $d['spouse_phone'], $d['address'],
-                $d['location'], $d['project'], $d['project_location'], $d['caution_location'],
+                $d['province'], $d['district'], $d['sector'], $d['cell'], $d['village'], $d['location'],
+                $d['project'], $d['project_location'], $d['caution_location'],
                 $d['loan_type'], $d['created_by'],
                 $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
                 $d['guarantor_phone'], $d['guarantor_occupation'],
@@ -139,7 +141,8 @@ function executeApproval($conn, $approval) {
                 account_number=?, occupation=?, gender=?, date_of_birth=?,
                 phone=?, father_name=?, mother_name=?, spouse=?,
                 spouse_occupation=?, spouse_phone=?, marriage_type=?, address=?,
-                location=?, project=?, project_location=?, caution_location=?,
+                province=?, district=?, sector=?, cell=?, village=?, location=?, 
+                project=?, project_location=?, caution_location=?,
                 email=?, organization=?, status='Approved', is_active=1, 
                 collateral_type=?, collateral_sub_type=?, upi_location=?, square_mtrs=?,
                 requested_amount=?, loan_duration=?,
@@ -147,12 +150,13 @@ function executeApproval($conn, $approval) {
                 WHERE customer_id=?";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
-            $stmt->bind_param('ssssssssssssssssssssssssssssi',
+            $stmt->bind_param('sssssssssssssssssssssssssssssssssi',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['phone'], $d['father_name'], $d['mother_name'], $d['spouse'],
                 $d['spouse_occupation'], $d['spouse_phone'], $d['marriage_type'], $d['address'],
-                $d['location'], $d['project'], $d['project_location'], $d['caution_location'],
+                $d['province'], $d['district'], $d['sector'], $d['cell'], $d['village'], $d['location'],
+                $d['project'], $d['project_location'], $d['caution_location'],
                 $d['email'], $d['organization'],
                 $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
                 $d['requested_amount'], $d['loan_duration'],

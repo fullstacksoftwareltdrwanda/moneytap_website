@@ -36,7 +36,8 @@ if (isset($_POST['add_customer'])) {
     $district           = trim($_POST['district']           ?? '');
     $sector             = trim($_POST['sector']             ?? '');
     $cell               = trim($_POST['cell']               ?? '');
-    $location           = implode(', ', array_filter([$cell, $sector, $district, $province]));
+    $village            = trim($_POST['village']            ?? '');
+    $location           = implode(', ', array_filter([$village, $cell, $sector, $district, $province]));
     $address            = trim($_POST['address']            ?? '');
 
     // ── Family & Marital ────────────────────────────────────────────────────
@@ -132,6 +133,11 @@ if (isset($_POST['add_customer'])) {
                 'spouse_occupation'   => $spouse_occupation,
                 'spouse_phone'        => $spouse_phone,
                 'address'             => $address,
+                'province'            => $province,
+                'district'            => $district,
+                'sector'              => $sector,
+                'cell'                => $cell,
+                'village'             => $village,
                 'location'            => $location,
                 'project'             => $project,
                 'project_location'    => $project_location,
@@ -309,19 +315,19 @@ function handle_file_upload($field, $upload_dir) {
                     <!-- Current Residence -->
                     <h6 class="section-title">Current Residence</h6>
                     <div class="row">
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-2 mb-3">
                             <label class="form-label">Province</label>
                             <select class="form-select" name="province" id="province">
                                 <option value="">Loading...</option>
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-2 mb-3">
                             <label class="form-label">District</label>
                             <select class="form-select" name="district" id="district" disabled>
                                 <option value="">Select Province first</option>
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-2 mb-3">
                             <label class="form-label">Sector</label>
                             <select class="form-select" name="sector" id="sector" disabled>
                                 <option value="">Select District first</option>
@@ -331,6 +337,12 @@ function handle_file_upload($field, $upload_dir) {
                             <label class="form-label">Cell</label>
                             <select class="form-select" name="cell" id="cell" disabled>
                                 <option value="">Select Sector first</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Village</label>
+                            <select class="form-select" name="village" id="village" disabled>
+                                <option value="">Select Cell first</option>
                             </select>
                         </div>
                     </div>
@@ -643,14 +655,14 @@ async function loadRwandaData() {
 
 // ── Current Residence cascade ──────────────────────────────────────────────
 document.getElementById('province')?.addEventListener('change', function () {
-    resetSelects('district', 'sector', 'cell');
+    resetSelects('district', 'sector', 'cell', 'village');
     if (this.value && rwandaData?.[this.value]) {
         populateSelect('district', Object.keys(rwandaData[this.value]));
     }
 });
 document.getElementById('district')?.addEventListener('change', function () {
     const prov = document.getElementById('province').value;
-    resetSelects('sector', 'cell');
+    resetSelects('sector', 'cell', 'village');
     if (prov && this.value && rwandaData?.[prov]?.[this.value]) {
         populateSelect('sector', Object.keys(rwandaData[prov][this.value]));
     }
@@ -658,9 +670,18 @@ document.getElementById('district')?.addEventListener('change', function () {
 document.getElementById('sector')?.addEventListener('change', function () {
     const prov = document.getElementById('province').value;
     const dist = document.getElementById('district').value;
-    resetSelects('cell');
+    resetSelects('cell', 'village');
     if (prov && dist && this.value && rwandaData?.[prov]?.[dist]?.[this.value]) {
         populateSelect('cell', Object.keys(rwandaData[prov][dist][this.value]));
+    }
+});
+document.getElementById('cell')?.addEventListener('change', function () {
+    const prov = document.getElementById('province').value;
+    const dist = document.getElementById('district').value;
+    const sect = document.getElementById('sector').value;
+    resetSelects('village');
+    if (prov && dist && sect && this.value && rwandaData?.[prov]?.[dist]?.[sect]?.[this.value]) {
+        populateSelect('village', rwandaData[prov][dist][sect][this.value]);
     }
 });
 

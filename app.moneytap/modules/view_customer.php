@@ -153,11 +153,11 @@ $resubbed = !empty($customer['resubmitted_fields']) ? explode(',', $customer['re
                         <p class="mb-3 x-small fw-bold text-muted">Period: <?php echo $customer['loan_duration'] ?? 0; ?> Months</p>
                     </div>
                     <div class="col-md-4">
-                        <label class="text-muted small mb-1 uppercase tracking-wider font-bold">Province & District</label>
-                        <p class="fw-bold mb-0 text-primary"><?php echo htmlspecialchars($customer['province'] ?: 'N/A'); ?></p>
+                        <label class="text-muted small mb-1 uppercase tracking-wider font-bold">Full Address</label>
+                        <p class="fw-bold mb-0 text-primary"><?php echo htmlspecialchars($customer['province'] ?: 'N/A'); ?> / <?php echo htmlspecialchars($customer['district'] ?: 'N/A'); ?></p>
                         <p class="fw-bold mb-3"><?php echo htmlspecialchars($customer['location'] ?: 'N/A'); ?></p>
 
-                        <label class="text-muted small mb-1 uppercase tracking-wider font-bold">Occupation</label>
+                        <label class="text-muted small mb-1 uppercase tracking-wider font-bold">Current Occupation</label>
                         <p class="fw-bold mb-3"><?php echo htmlspecialchars($customer['occupation'] ?: 'N/A'); ?></p>
                     </div>
                 </div>

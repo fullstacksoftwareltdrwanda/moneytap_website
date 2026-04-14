@@ -51,6 +51,11 @@ if ($stmt) {
         'spouse_phone' => $customer['spouse_phone'] ?? '',
         'marriage_type' => $customer['marriage_type'] ?? 'Single',
         'address' => $customer['address'],
+        'province' => $customer['province'] ?? '',
+        'district' => $customer['district'] ?? '',
+        'sector' => $customer['sector'] ?? '',
+        'cell' => $customer['cell'] ?? '',
+        'village' => $customer['village'] ?? '',
         'location' => $customer['location'] ?? '',
         'project' => $customer['project'] ?? '',
         'project_location' => $customer['project_location'] ?? '',
@@ -99,7 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
     $spouse_phone = trim($_POST['spouse_phone'] ?? '');
     $marriage_type = $_POST['marriage_type'] ?? 'Single';
     $address = trim($_POST['address'] ?? '');
-    $location = trim($_POST['location']);
+    $province = trim($_POST['province'] ?? '');
+    $district = trim($_POST['district'] ?? '');
+    $sector = trim($_POST['sector'] ?? '');
+    $cell = trim($_POST['cell'] ?? '');
+    $village = trim($_POST['village'] ?? '');
+    $location = implode(', ', array_filter([$village, $cell, $sector, $district, $province])) ?: trim($_POST['location'] ?? '');
     $project = trim($_POST['project']);
     $project_location = trim($_POST['project_location']);
     $caution_location = trim($_POST['caution_location']);
@@ -154,6 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
             'spouse_phone'       => $spouse_phone,
             'marriage_type'      => $marriage_type,
             'address'            => $address,
+            'province'           => $province,
+            'district'           => $district,
+            'sector'             => $sector,
+            'cell'               => $cell,
+            'village'            => $village,
             'location'           => $location,
             'project'            => $project,
             'project_location'   => $project_location,
@@ -280,7 +295,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
                                         <div class="col-md-6 mb-3"><label class="form-label">Caution Loc.</label><input type="text" class="form-control" name="caution_location" value="<?php echo htmlspecialchars($form_data['caution_location']); ?>"></div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-12 mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address"><?php echo htmlspecialchars($form_data['address']); ?></textarea></div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">Province</label>
+                                            <select class="form-select" name="province" id="province">
+                                                <option value="">Loading...</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">District</label>
+                                            <select class="form-select" name="district" id="district" disabled></select>
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">Sector</label>
+                                            <select class="form-select" name="sector" id="sector" disabled></select>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label class="form-label">Cell</label>
+                                            <select class="form-select" name="cell" id="cell" disabled></select>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label class="form-label">Village</label>
+                                            <select class="form-select" name="village" id="village" disabled></select>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label class="form-label">Current Full Location</label>
+                                            <input type="text" class="form-control" name="location" id="location_input" value="<?php echo htmlspecialchars($form_data['location']); ?>">
+                                        </div>
+                                        <div class="col-md-12 mb-3"><label class="form-label">Address / Street</label><textarea class="form-control" name="address"><?php echo htmlspecialchars($form_data['address']); ?></textarea></div>
                                     </div>
                                 </div>
                             </div>
@@ -377,6 +420,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
 </div>
 
 <script>
+const jsonUrl = 'https://raw.githubusercontent.com/ngabovictor/Rwanda/master/data.json';
+let rwandaData = null;
+
+function populateSelect(id, options, selectedValue) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    select.innerHTML = '<option value="">Select...</option>';
+    options.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (opt === selectedValue) o.selected = true;
+        select.appendChild(o);
+    });
+    select.disabled = false;
+}
+
+function resetSelects(...ids) {
+    ids.forEach(id => {
+        const s = document.getElementById(id);
+        if (s) {
+            s.innerHTML = '<option value="">Select...</option>';
+            s.disabled = true;
+        }
+    });
+}
+
+async function loadRwandaData() {
+    try {
+        const res = await fetch(jsonUrl);
+        rwandaData = await res.json();
+        
+        const initialProv = "<?php echo $form_data['province']; ?>";
+        const initialDist = "<?php echo $form_data['district']; ?>";
+        const initialSect = "<?php echo $form_data['sector']; ?>";
+        const initialCell = "<?php echo $form_data['cell']; ?>";
+        const initialVill = "<?php echo $form_data['village']; ?>";
+
+        populateSelect('province', Object.keys(rwandaData), initialProv);
+        
+        if (initialProv && rwandaData[initialProv]) {
+            populateSelect('district', Object.keys(rwandaData[initialProv]), initialDist);
+            if (initialDist && rwandaData[initialProv][initialDist]) {
+                populateSelect('sector', Object.keys(rwandaData[initialProv][initialDist]), initialSect);
+                if (initialSect && rwandaData[initialProv][initialDist][initialSect]) {
+                    populateSelect('cell', Object.keys(rwandaData[initialProv][initialDist][initialSect]), initialCell);
+                    if (initialCell && rwandaData[initialProv][initialDist][initialSect][initialCell]) {
+                        populateSelect('village', rwandaData[initialProv][initialDist][initialSect][initialCell], initialVill);
+                    }
+                }
+            }
+        }
+    } catch (err) { console.error(err); }
+}
+
+document.getElementById('province')?.addEventListener('change', function () {
+    resetSelects('district', 'sector', 'cell', 'village');
+    if (this.value && rwandaData?.[this.value]) populateSelect('district', Object.keys(rwandaData[this.value]));
+});
+document.getElementById('district')?.addEventListener('change', function () {
+    const prov = document.getElementById('province').value;
+    resetSelects('sector', 'cell', 'village');
+    if (prov && this.value && rwandaData?.[prov]?.[this.value]) populateSelect('sector', Object.keys(rwandaData[prov][this.value]));
+});
+document.getElementById('sector')?.addEventListener('change', function () {
+    const prov = document.getElementById('province').value;
+    const dist = document.getElementById('district').value;
+    resetSelects('cell', 'village');
+    if (prov && dist && this.value && rwandaData?.[prov]?.[dist]?.[this.value]) populateSelect('cell', Object.keys(rwandaData[prov][dist][this.value]));
+});
+document.getElementById('cell')?.addEventListener('change', function () {
+    const prov = document.getElementById('province').value;
+    const dist = document.getElementById('district').value;
+    const sect = document.getElementById('sector').value;
+    resetSelects('village');
+    if (prov && dist && sect && this.value && rwandaData?.[prov]?.[dist]?.[sect]?.[this.value]) populateSelect('village', rwandaData[prov][dist][sect][this.value]);
+});
+
+loadRwandaData();
+
 function toggleCollateralOptions() {
     const type = document.getElementById('collateral_type').value;
     document.getElementById('movable_section').classList.toggle('d-none', type !== 'Movable');
