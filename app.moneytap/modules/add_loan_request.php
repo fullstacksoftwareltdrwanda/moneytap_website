@@ -283,14 +283,14 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                         </div>
                         <div class="col-md-5 mt-4">
                             <label class="form-label fw-bold text-dark">Economic Center</label>
-                            <select name="economic_center" class="form-select rounded-4 py-3 fw-bold text-dark" style="color: #000 !important;">
-                                <option value="" class="text-dark">Select Economic Sector</option>
-                                <option value="Agriculture/Livestock/Fishing" class="text-dark">Agriculture/Livestock/Fishing</option>
-                                <option value="Public work" class="text-dark">Public work</option>
-                                <option value="Constructions" class="text-dark">Constructions</option>
-                                <option value="Commerce/Restaurant" class="text-dark">Commerce/Restaurant</option>
-                                <option value="Transport" class="text-dark">Transport</option>
-                                <option value="Other" class="text-dark">Other</option>
+                            <select name="economic_center" class="form-select" required>
+                                <option value="">Select Economic Sector</option>
+                                <option value="Agriculture/Livestock/Fishing">Agriculture/Livestock/Fishing</option>
+                                <option value="Public work">Public work</option>
+                                <option value="Constructions">Constructions</option>
+                                <option value="Commerce/Restaurant">Commerce/Restaurant</option>
+                                <option value="Transport">Transport</option>
+                                <option value="Other">Other</option>
                             </select>
                         </div>
 
