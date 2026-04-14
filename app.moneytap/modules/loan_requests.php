@@ -146,7 +146,15 @@ $requests = $conn->query($query);
                                     </td>
                                     <td>
                                         <div class="fw-black text-dark"><?php echo htmlspecialchars($req['customer_name']); ?></div>
-                                        <div class="text-primary x-small fw-bold"><?php echo $req['customer_code']; ?></div>
+                                        <div class="text-primary x-small fw-bold mb-1"><?php echo $req['customer_code']; ?></div>
+                                        <?php if (!empty($req['economic_center'])): ?>
+                                            <span class="badge bg-light text-primary border-primary border-opacity-25 x-small px-2 mb-1" style="font-size: 9px;"><?php echo strtoupper($req['economic_center']); ?></span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($req['loan_purpose'])): ?>
+                                            <div class="text-muted x-small italic" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?php echo htmlspecialchars($req['loan_purpose']); ?>">
+                                                <i class="bi bi-info-circle me-1"></i><?php echo htmlspecialchars($req['loan_purpose']); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-end fw-black fs-6">
                                         FRW <?php echo number_format($req['loan_amount']); ?>

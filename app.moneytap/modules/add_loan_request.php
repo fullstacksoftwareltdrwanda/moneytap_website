@@ -19,6 +19,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS loan_requests (
     is_requested_paid_upfront TINYINT(1) DEFAULT 0,
     status ENUM('Pending', 'Approved', 'Rejected', 'Disbursed') DEFAULT 'Pending',
     admin_note TEXT,
+    loan_purpose TEXT,
+    economic_center VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
@@ -71,6 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
 
     $req_amt = parseMoney($_POST['requested_amount_fee']);
     $req_paid = parseMoney($_POST['req_amt_paid'] ?? '0');
+    $loan_purpose = trim($_POST['loan_purpose'] ?? '');
+    $economic_center = trim($_POST['economic_center'] ?? '');
 
     // VALIDATION: Prevent overpayment
     if ($req_paid > $req_amt) {
@@ -78,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
         $cid = 0; // Trigger error block below
     }
 
-    $is_paid_fully = ($req_paid >= $req_amt) ? 1 : 0;
+    $at_paid_upfront = ($req_paid >= $req_amt) ? 1 : 0;
     $total_d = $amt;
 
     if ($cid <= 0 || $amt <= 0) {
@@ -87,10 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
     } else {
         $prep = "INSERT INTO loan_requests (customer_id, loan_amount, total_disbursed, interest_rate, number_of_instalments, 
                                          management_fee_rate, deduct_fee_from_disbursed, mgmt_fee_first_month_only, 
-                                         requested_amount, requested_amount_paid, is_requested_paid_upfront, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')";
+                                         requested_amount, requested_amount_paid, is_requested_paid_upfront, status,
+                                         loan_purpose, economic_center) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)";
         $stmt = $conn->prepare($prep);
-        $stmt->bind_param("idddidddddi", $cid, $amt, $total_d, $rate, $inst, $mgmt_r, $deduct_f, $mgmt_first, $req_amt, $req_paid, $is_paid_fully);
+        $stmt->bind_param("idddidddddiss", $cid, $amt, $total_d, $rate, $inst, $mgmt_r, $deduct_f, $mgmt_first, $req_amt, $req_paid, $at_paid_upfront, $loan_purpose, $economic_center);
 
 
         if ($stmt->execute()) {
@@ -269,6 +274,24 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                             <label class="form-label fw-bold text-dark">Duration (Months)</label>
                             <input type="number" name="duration" class="form-control rounded-4 py-3 fw-bold"
                                 value="<?php echo $pre_loan_duration; ?>">
+                        </div>
+
+                        <!-- Loan Purpose & Economic Center -->
+                        <div class="col-md-7 mt-4">
+                            <label class="form-label fw-bold text-dark">Loan Purpose / Description</label>
+                            <textarea name="loan_purpose" class="form-control rounded-4 py-2" rows="2" placeholder="Briefly describe the purpose of this loan..."></textarea>
+                        </div>
+                        <div class="col-md-5 mt-4">
+                            <label class="form-label fw-bold text-dark">Economic Center</label>
+                            <select name="economic_center" class="form-select rounded-4 py-3 fw-bold">
+                                <option value="">Select Economic Sector</option>
+                                <option value="Agriculture/Livestock/Fishing">Agriculture/Livestock/Fishing</option>
+                                <option value="Public work">Public work</option>
+                                <option value="Constructions">Constructions</option>
+                                <option value="Commerce/Restaurant">Commerce/Restaurant</option>
+                                <option value="Transport">Transport</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
 
                         <!-- Fees Section Header -->

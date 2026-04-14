@@ -752,7 +752,15 @@ $filtered_loan_count = ($filter_status == 'all') ? $total_all_loans : ($status_c
                                     <td><strong><?php echo htmlspecialchars($loan['loan_number']); ?></strong></td>
                                     <td>
                                         <?php echo htmlspecialchars($loan['customer_name']); ?><br>
-                                        <small class="text-muted"><?php echo htmlspecialchars($loan['customer_code']); ?></small>
+                                        <small class="badge bg-light text-primary border-primary border-opacity-25 x-small px-2 py-0" style="font-size: 8px;"><?php echo strtoupper($loan['customer_code']); ?></small>
+                                        <?php if (!empty($loan['economic_center'])): ?>
+                                            <span class="badge bg-light text-success border-success border-opacity-25 x-small px-2 py-0" style="font-size: 8px;"><?php echo strtoupper($loan['economic_center']); ?></span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($loan['loan_purpose'])): ?>
+                                            <div class="text-muted" style="font-size: 10px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?php echo htmlspecialchars($loan['loan_purpose']); ?>">
+                                                <i class="bi bi-info-circle me-1"></i><?php echo htmlspecialchars($loan['loan_purpose']); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php echo number_format($loan['total_disbursed'], 2); ?><br>

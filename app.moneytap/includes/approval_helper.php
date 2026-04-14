@@ -215,7 +215,8 @@ function executeApproval($conn, $approval) {
                 deduct_fee_from_disbursed,
                 mgmt_fee_first_month_only,
                 mgmt_fee_is_disbursed,
-                requested_amount, requested_amount_paid_upfront, is_requested_paid_upfront, requested_amount_status
+                requested_amount, requested_amount_paid_upfront, is_requested_paid_upfront, requested_amount_status,
+                loan_purpose, economic_center
             ) VALUES (
                 " . intval($d['customer_id']) . ",
                 '" . $conn->real_escape_string($d['loan_number']) . "',
@@ -253,7 +254,9 @@ function executeApproval($conn, $approval) {
                 " . intval($d['deduct_fee_from_disbursed'] ?? 1) . ",
                 " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
                 " . intval($d['mgmt_fee_is_disbursed'] ?? 0) . ",
-                $requested_amount, $requested_paid, $is_paid_fully, '$requested_status'
+                $requested_amount, $requested_paid, $is_paid_fully, '$requested_status',
+                '" . $conn->real_escape_string($d['loan_purpose'] ?? '') . "',
+                '" . $conn->real_escape_string($d['economic_center'] ?? '') . "'
             )";
             
             if (!$conn->query($sql)) throw new Exception("Add loan failed: " . $conn->error . " | SQL: " . $sql);

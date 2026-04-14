@@ -342,6 +342,8 @@ if ($request_data) {
     $default_total_interest = $schedule_data['total_interest'];
     $default_total_management_fees = $schedule_data['total_management_fees'];
     $default_total_payment = $schedule_data['total_payment'];
+    $default_loan_purpose = $request_data['loan_purpose'] ?? '';
+    $default_economic_center = $request_data['economic_center'] ?? '';
 }
 
 // Default dates in dd/mm/yyyy format
@@ -380,6 +382,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $requested_amount = parseMoney($_POST['requested_amount'] ?? '0');
         $requested_amount_paid = parseMoney($_POST['requested_amount_paid'] ?? '0');
         $is_requested_paid_upfront = isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1' ? 1 : 0;
+        $loan_purpose = trim($_POST['loan_purpose'] ?? '');
+        $economic_center = trim($_POST['economic_center'] ?? '');
 
         // -------------------------------------------------------
         // TOP-UP: Capture is_topup and topup_type
@@ -530,6 +534,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'requested_amount_paid_upfront' => $requested_amount_paid,
                                     'is_requested_paid_upfront' => $is_requested_paid_upfront,
                                     'requested_amount_status' => ($requested_amount_paid >= $requested_amount) ? 'Paid' : 'Added to Installment',
+                                    'loan_purpose'           => $loan_purpose,
+                                    'economic_center'        => $economic_center,
                                     'request_id'             => isset($_POST['request_id']) ? intval($_POST['request_id']) : 0,
                                     'submitted_by'           => $_SESSION['username'] ?? 'system',
                                 ];
@@ -754,6 +760,29 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                         <!-- Summary badge shown after selection -->
                                         <div id="topupTypeBadge" class="mt-2" style="display:none;"></div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-7">
+                                <div class="mb-3">
+                                    <label class="form-label">Loan Purpose / Description</label>
+                                    <textarea name="loan_purpose" class="form-control" rows="2" placeholder="Briefly describe the purpose of this loan..."><?php echo htmlspecialchars($default_loan_purpose ?? ''); ?></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="mb-3">
+                                    <label class="form-label">Economic Center</label>
+                                    <select name="economic_center" class="form-select">
+                                        <option value="">Select Economic Sector</option>
+                                        <option value="Agriculture/Livestock/Fishing" <?php echo ($default_economic_center ?? '') === 'Agriculture/Livestock/Fishing' ? 'selected' : ''; ?>>Agriculture/Livestock/Fishing</option>
+                                        <option value="Public work" <?php echo ($default_economic_center ?? '') === 'Public work' ? 'selected' : ''; ?>>Public work</option>
+                                        <option value="Constructions" <?php echo ($default_economic_center ?? '') === 'Constructions' ? 'selected' : ''; ?>>Constructions</option>
+                                        <option value="Commerce/Restaurant" <?php echo ($default_economic_center ?? '') === 'Commerce/Restaurant' ? 'selected' : ''; ?>>Commerce/Restaurant</option>
+                                        <option value="Transport" <?php echo ($default_economic_center ?? '') === 'Transport' ? 'selected' : ''; ?>>Transport</option>
+                                        <option value="Other" <?php echo ($default_economic_center ?? '') === 'Other' ? 'selected' : ''; ?>>Other</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
