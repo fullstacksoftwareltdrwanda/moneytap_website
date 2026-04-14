@@ -774,14 +774,14 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                             <div class="col-md-5">
                                 <div class="mb-3">
                                     <label class="form-label">Economic Center</label>
-                                    <select name="economic_center" class="form-select">
-                                        <option value="">Select Economic Sector</option>
-                                        <option value="Agriculture/Livestock/Fishing" <?php echo ($default_economic_center ?? '') === 'Agriculture/Livestock/Fishing' ? 'selected' : ''; ?>>Agriculture/Livestock/Fishing</option>
-                                        <option value="Public work" <?php echo ($default_economic_center ?? '') === 'Public work' ? 'selected' : ''; ?>>Public work</option>
-                                        <option value="Constructions" <?php echo ($default_economic_center ?? '') === 'Constructions' ? 'selected' : ''; ?>>Constructions</option>
-                                        <option value="Commerce/Restaurant" <?php echo ($default_economic_center ?? '') === 'Commerce/Restaurant' ? 'selected' : ''; ?>>Commerce/Restaurant</option>
-                                        <option value="Transport" <?php echo ($default_economic_center ?? '') === 'Transport' ? 'selected' : ''; ?>>Transport</option>
-                                        <option value="Other" <?php echo ($default_economic_center ?? '') === 'Other' ? 'selected' : ''; ?>>Other</option>
+                                    <select name="economic_center" class="form-select text-dark" style="color: #000 !important;">
+                                        <option value="" class="text-dark">Select Economic Sector</option>
+                                        <option value="Agriculture/Livestock/Fishing" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Agriculture/Livestock/Fishing' ? 'selected' : ''; ?>>Agriculture/Livestock/Fishing</option>
+                                        <option value="Public work" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Public work' ? 'selected' : ''; ?>>Public work</option>
+                                        <option value="Constructions" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Constructions' ? 'selected' : ''; ?>>Constructions</option>
+                                        <option value="Commerce/Restaurant" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Commerce/Restaurant' ? 'selected' : ''; ?>>Commerce/Restaurant</option>
+                                        <option value="Transport" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Transport' ? 'selected' : ''; ?>>Transport</option>
+                                        <option value="Other" class="text-dark" <?php echo ($default_economic_center ?? '') === 'Other' ? 'selected' : ''; ?>>Other</option>
                                     </select>
                                 </div>
                             </div>
