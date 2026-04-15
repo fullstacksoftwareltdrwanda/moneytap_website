@@ -78,6 +78,22 @@ function canApprove() {
 }
 
 /**
+ * Generate the next available customer code in CUST-0001 format.
+ */
+function getNextCustomerCode($conn) {
+    $sql = "SELECT MAX(CAST(SUBSTRING(customer_code, 6) AS UNSIGNED)) AS max_num
+            FROM customers
+            WHERE customer_code LIKE 'CUST-%'";
+    $res = $conn->query($sql);
+    $max = 0;
+    if ($res && ($row = $res->fetch_assoc())) {
+        $max = (int)($row['max_num'] ?? 0);
+    }
+    $next = $max + 1;
+    return 'CUST-' . str_pad((string)$next, 4, '0', STR_PAD_LEFT);
+}
+
+/**
  * Execute an approved action — actually writes to the database.
  */
 function executeApproval($conn, $approval) {
@@ -90,47 +106,79 @@ function executeApproval($conn, $approval) {
 
         // ── CUSTOMER: ADD ────────────────────────────────────────────────────
         case 'customer.add': {
-            $sql = "INSERT INTO customers (
-                customer_code, customer_name, birth_place, id_number, account_number,
-                occupation, gender, date_of_birth, record_date, phone, email,
-                organization, father_name, mother_name, marriage_type, spouse,
-                spouse_id, spouse_occupation, spouse_phone, address, 
-                province, district, sector, cell, village, location,
-                project, project_location, caution_location, loan_type, created_by,
-                has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
-                collateral_type, collateral_sub_type, upi_location, square_mtrs,
-                doc_id, doc_contract, doc_statement, doc_payslip, doc_marital, doc_rdb,
-                doc_loan_clearance, doc_power_of_attorney, doc_guarantor_letter,
-                requested_amount, loan_duration,
-                created_at, updated_at, is_active, status
-            ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
-            )";
-            $stmt = $conn->prepare($sql);
-            if (!$stmt) throw new Exception($conn->error);
             $d = $data;
-            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssssssssssssssss',
-                $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
-                $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
-                $d['record_date'], $d['phone'], $d['email'], $d['organization'],
-                $d['father_name'], $d['mother_name'], $d['marriage_type'], $d['spouse'],
-                $d['spouse_id'], $d['spouse_occupation'], $d['spouse_phone'], $d['address'],
-                $d['province'], $d['district'], $d['sector'], $d['cell'], $d['village'], $d['location'],
-                $d['project'], $d['project_location'], $d['caution_location'],
-                $d['loan_type'], $d['created_by'],
-                $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
-                $d['guarantor_phone'], $d['guarantor_occupation'],
-                $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
-                $d['doc_id'], $d['doc_contract'], $d['doc_statement'], $d['doc_payslip'], $d['doc_marital'], $d['doc_rdb'],
-                $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter'],
-                $d['requested_amount'], $d['loan_duration']
-            );
-            if (!$stmt->execute()) throw new Exception($stmt->error);
+            if (empty($d['customer_code'])) {
+                $d['customer_code'] = getNextCustomerCode($conn);
+            }
+
+            $maxAttempts = 5;
+            $attempt = 0;
+            $inserted = false;
+            $lastErr = '';
+
+            while ($attempt < $maxAttempts && !$inserted) {
+                $sql = "INSERT INTO customers (
+                    customer_code, customer_name, birth_place, id_number, account_number,
+                    occupation, gender, date_of_birth, record_date, phone, email,
+                    organization, father_name, mother_name, marriage_type, spouse,
+                    spouse_id, spouse_occupation, spouse_phone, address, 
+                    province, district, sector, cell, village, location,
+                    project, project_location, caution_location, loan_type, created_by,
+                    has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
+                    collateral_type, collateral_sub_type, upi_location, square_mtrs,
+                    doc_id, doc_contract, doc_statement, doc_payslip, doc_marital, doc_rdb,
+                    doc_loan_clearance, doc_power_of_attorney, doc_guarantor_letter,
+                    requested_amount, loan_duration,
+                    created_at, updated_at, is_active, status
+                ) VALUES (
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
+                )";
+                $stmt = $conn->prepare($sql);
+                if (!$stmt) throw new Exception($conn->error);
+
+                $stmt->bind_param('sssssssssssssssssssssssssssssssssssssssssssssssssss',
+                    $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
+                    $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
+                    $d['record_date'], $d['phone'], $d['email'], $d['organization'],
+                    $d['father_name'], $d['mother_name'], $d['marriage_type'], $d['spouse'],
+                    $d['spouse_id'], $d['spouse_occupation'], $d['spouse_phone'], $d['address'],
+                    $d['province'], $d['district'], $d['sector'], $d['cell'], $d['village'], $d['location'],
+                    $d['project'], $d['project_location'], $d['caution_location'],
+                    $d['loan_type'], $d['created_by'],
+                    $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
+                    $d['guarantor_phone'], $d['guarantor_occupation'],
+                    $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
+                    $d['doc_id'], $d['doc_contract'], $d['doc_statement'], $d['doc_payslip'], $d['doc_marital'], $d['doc_rdb'],
+                    $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter'],
+                    $d['requested_amount'], $d['loan_duration']
+                );
+
+                if ($stmt->execute()) {
+                    $inserted = true;
+                    $stmt->close();
+                    break;
+                }
+
+                $isDuplicateCode = ($stmt->errno === 1062 && strpos($stmt->error, 'uq_customer_code') !== false);
+                $lastErr = $stmt->error;
+                $stmt->close();
+
+                if (!$isDuplicateCode) {
+                    throw new Exception($lastErr);
+                }
+
+                // Regenerate code and retry to avoid blocking valid approvals.
+                $d['customer_code'] = getNextCustomerCode($conn);
+                $attempt++;
+            }
+
+            if (!$inserted) {
+                throw new Exception($lastErr ?: 'Could not generate a unique customer code.');
+            }
             
             require_once __DIR__ . '/activity_logger.php';
             logActivity($conn, 'create', 'customer', $conn->insert_id, "Approved creation of customer: {$d['customer_name']}");
             
-            $stmt->close();
             break;
         }
 
