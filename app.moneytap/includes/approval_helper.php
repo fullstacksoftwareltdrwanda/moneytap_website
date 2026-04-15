@@ -99,16 +99,17 @@ function executeApproval($conn, $approval) {
                 project, project_location, caution_location, loan_type, created_by,
                 has_guarantor, guarantor_name, guarantor_id, guarantor_phone, guarantor_occupation,
                 collateral_type, collateral_sub_type, upi_location, square_mtrs,
+                doc_id, doc_contract, doc_statement, doc_payslip, doc_marital, doc_rdb,
                 doc_loan_clearance, doc_power_of_attorney, doc_guarantor_letter,
                 requested_amount, loan_duration,
                 created_at, updated_at, is_active, status
             ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),1,'Approved'
             )";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
             $d = $data;
-            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssssssssss',
+            $stmt->bind_param('sssssssssssssssssssssssssssssssssssssssssssssssssss',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['record_date'], $d['phone'], $d['email'], $d['organization'],
@@ -120,6 +121,7 @@ function executeApproval($conn, $approval) {
                 $d['has_guarantor'], $d['guarantor_name'], $d['guarantor_id'],
                 $d['guarantor_phone'], $d['guarantor_occupation'],
                 $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
+                $d['doc_id'], $d['doc_contract'], $d['doc_statement'], $d['doc_payslip'], $d['doc_marital'], $d['doc_rdb'],
                 $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter'],
                 $d['requested_amount'], $d['loan_duration']
             );
@@ -145,12 +147,14 @@ function executeApproval($conn, $approval) {
                 project=?, project_location=?, caution_location=?,
                 email=?, organization=?, status='Approved', is_active=1, 
                 collateral_type=?, collateral_sub_type=?, upi_location=?, square_mtrs=?,
+                doc_id=?, doc_contract=?, doc_statement=?, doc_payslip=?, doc_marital=?, doc_rdb=?,
+                doc_loan_clearance=?, doc_power_of_attorney=?, doc_guarantor_letter=?,
                 requested_amount=?, loan_duration=?,
                 updated_at=NOW()
                 WHERE customer_id=?";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
-            $stmt->bind_param('sssssssssssssssssssssssssssssssssi',
+            $stmt->bind_param('ssssssssssssssssssssssssssssssssssssssssssi',
                 $d['customer_code'], $d['customer_name'], $d['birth_place'], $d['id_number'],
                 $d['account_number'], $d['occupation'], $d['gender'], $d['date_of_birth'],
                 $d['phone'], $d['father_name'], $d['mother_name'], $d['spouse'],
@@ -159,6 +163,8 @@ function executeApproval($conn, $approval) {
                 $d['project'], $d['project_location'], $d['caution_location'],
                 $d['email'], $d['organization'],
                 $d['collateral_type'], $d['collateral_sub_type'], $d['upi_location'], $d['square_mtrs'],
+                $d['doc_id'], $d['doc_contract'], $d['doc_statement'], $d['doc_payslip'], $d['doc_marital'], $d['doc_rdb'],
+                $d['doc_loan_clearance'], $d['doc_power_of_attorney'], $d['doc_guarantor_letter'],
                 $d['requested_amount'], $d['loan_duration'],
                 $entity_id
             );
@@ -548,6 +554,8 @@ function executeApproval($conn, $approval) {
                 requested_amount = " . floatval($d['requested_amount'] ?? 0) . ",
                 is_requested_paid_upfront = " . intval($d['is_requested_paid_upfront'] ?? 0) . ",
                 requested_amount_status = '" . (($d['is_requested_paid_upfront'] ?? 0) ? 'Paid' : 'Added to Installment') . "',
+                loan_purpose = '" . $conn->real_escape_string($d['loan_purpose'] ?? '') . "',
+                economic_center = '" . $conn->real_escape_string($d['economic_center'] ?? '') . "',
                 updated_at = NOW()
             WHERE loan_id = " . intval($entity_id);
             
