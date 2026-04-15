@@ -67,6 +67,12 @@ if ($stmt) {
         'collateral_sub_type' => $customer['collateral_sub_type'] ?? '',
         'upi_location'        => $customer['upi_location'] ?? '',
         'square_mtrs'         => $customer['square_mtrs'] ?? '',
+        'doc_id'              => $customer['doc_id'] ?? '',
+        'doc_contract'        => $customer['doc_contract'] ?? '',
+        'doc_statement'       => $customer['doc_statement'] ?? '',
+        'doc_payslip'         => $customer['doc_payslip'] ?? '',
+        'doc_marital'         => $customer['doc_marital'] ?? '',
+        'doc_rdb'             => $customer['doc_rdb'] ?? '',
         'doc_loan_clearance'  => $customer['doc_loan_clearance'] ?? '',
         'doc_power_of_attorney'=> $customer['doc_power_of_attorney'] ?? '',
         'doc_guarantor_letter' => $customer['doc_guarantor_letter'] ?? '',
@@ -125,6 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
     $upload_dir = __DIR__ . '/../uploads/documents/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
+    $doc_id               = handleEditFileUpload('doc_id',               $upload_dir, $form_data['doc_id']);
+    $doc_contract         = handleEditFileUpload('doc_contract',         $upload_dir, $form_data['doc_contract']);
+    $doc_statement        = handleEditFileUpload('doc_statement',        $upload_dir, $form_data['doc_statement']);
+    $doc_payslip          = handleEditFileUpload('doc_payslip',          $upload_dir, $form_data['doc_payslip']);
+    $doc_marital          = handleEditFileUpload('doc_marital',          $upload_dir, $form_data['doc_marital']);
+    $doc_rdb              = handleEditFileUpload('doc_rdb',              $upload_dir, $form_data['doc_rdb']);
     $doc_loan_clearance   = handleEditFileUpload('doc_loan_clearance',   $upload_dir, $form_data['doc_loan_clearance']);
     $doc_power_of_attorney= handleEditFileUpload('doc_power_of_attorney', $upload_dir, $form_data['doc_power_of_attorney']);
     $doc_guarantor_letter = handleEditFileUpload('doc_guarantor_letter',  $upload_dir, $form_data['doc_guarantor_letter']);
@@ -179,9 +191,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
             'collateral_sub_type'=> $_POST['collateral_sub_type'] ?? '',
             'upi_location'       => $_POST['upi_location'] ?? '',
             'square_mtrs'        => $_POST['square_mtrs'] ?? '',
+            'doc_id'             => $doc_id,
+            'doc_contract'       => $doc_contract,
+            'doc_statement'      => $doc_statement,
+            'doc_payslip'        => $doc_payslip,
+            'doc_marital'        => $doc_marital,
+            'doc_rdb'            => $doc_rdb,
             'doc_loan_clearance'  => $doc_loan_clearance,
             'doc_power_of_attorney'=> $doc_power_of_attorney,
             'doc_guarantor_letter' => $doc_guarantor_letter,
+            'requested_amount'    => $_POST['requested_amount'] ?? 0,
+            'loan_duration'       => $_POST['loan_duration'] ?? 0,
         ];
 
         if (submitForApproval($conn, 'edit', 'customer', $customer_id, $approval_data, "Edit customer: $customer_name")) {
@@ -383,24 +403,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_customer'])) {
                                 <div class="accordion-body">
                                     <div class="row">
                                         <div class="col-md-4 mb-3">
+                                            <label class="form-label">National ID</label>
+                                            <input type="file" class="form-control" name="doc_id">
+                                            <?php if (!empty($form_data['doc_id'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_id']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Work Contract</label>
+                                            <input type="file" class="form-control" name="doc_contract">
+                                            <?php if (!empty($form_data['doc_contract'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_contract']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Bank Statement</label>
+                                            <input type="file" class="form-control" name="doc_statement">
+                                            <?php if (!empty($form_data['doc_statement'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_statement']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Payslip</label>
+                                            <input type="file" class="form-control" name="doc_payslip">
+                                            <?php if (!empty($form_data['doc_payslip'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_payslip']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Marital Certificate</label>
+                                            <input type="file" class="form-control" name="doc_marital">
+                                            <?php if (!empty($form_data['doc_marital'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_marital']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">RDB Certificate</label>
+                                            <input type="file" class="form-control" name="doc_rdb">
+                                            <?php if (!empty($form_data['doc_rdb'])): ?>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_rdb']); ?>" target="_blank">View File</a></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
                                             <label class="form-label">Loan Clearance</label>
                                             <input type="file" class="form-control" name="doc_loan_clearance">
                                             <?php if (!empty($form_data['doc_loan_clearance'])): ?>
-                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_loan_clearance']; ?>" target="_blank">View File</a></small>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_loan_clearance']); ?>" target="_blank">View File</a></small>
                                             <?php endif; ?>
                                         </div>
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">Power of Attorney</label>
                                             <input type="file" class="form-control" name="doc_power_of_attorney">
                                             <?php if (!empty($form_data['doc_power_of_attorney'])): ?>
-                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_power_of_attorney']; ?>" target="_blank">View File</a></small>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_power_of_attorney']); ?>" target="_blank">View File</a></small>
                                             <?php endif; ?>
                                         </div>
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">Guarantor Letter</label>
                                             <input type="file" class="form-control" name="doc_guarantor_letter">
                                             <?php if (!empty($form_data['doc_guarantor_letter'])): ?>
-                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo $form_data['doc_guarantor_letter']; ?>" target="_blank">View File</a></small>
+                                                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle-fill"></i> Current: <a href="uploads/documents/<?php echo basename($form_data['doc_guarantor_letter']); ?>" target="_blank">View File</a></small>
                                             <?php endif; ?>
                                         </div>
                                     </div>
