@@ -1365,8 +1365,7 @@ endif; ?>
                                     <th class="text-end">Opening Balance</th>
                                     <th class="text-end">Principal</th>
                                     <th class="text-end">Interest</th>
-                                    <th class="text-end">Management Fee</th>
-                                    <th class="text-end text-primary" style="background:#e7f3ff;">Requested Amt</th>
+                                    <th class="text-end">Processing Fee</th>
                                     <th class="text-end">Total Payment</th>
                                     <th class="text-end">Closing Balance</th>
                                 </tr>
@@ -1381,8 +1380,8 @@ endif; ?>
         $interest = floatval($inst['interest_amount']);
         $mgmt_fee = floatval($inst['management_fee']);
         $req_amount = floatval($inst['requested_amount'] ?? 0);
-        // Force calculation to ensure Requested amount is always included
-        $total_payment = $principal + $interest + $mgmt_fee + $req_amount;
+        // Total payment no longer includes requested_amount in schedule
+        $total_payment = $principal + $interest + $mgmt_fee;
         $closing_balance = floatval($inst['closing_balance']);
         $paid_amount = floatval($inst['paid_amount']);
         $balance = floatval($inst['balance_remaining']);

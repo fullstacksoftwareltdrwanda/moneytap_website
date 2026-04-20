@@ -249,8 +249,10 @@ function executeApproval($conn, $approval) {
             $requested_amount = floatval($d['requested_amount'] ?? 0);
             $requested_paid   = floatval($d['requested_amount_paid_upfront'] ?? 0);
             $requested_rem    = max(0, $requested_amount - $requested_paid);
-            $is_paid_fully    = ($requested_paid >= $requested_amount) ? 1 : 0;
-            $requested_status = $is_paid_fully ? 'Paid' : 'Added to Installment';
+            
+            // If there's a remainder, it's deducted from the payout. So effectively it's paid.
+            $is_paid_fully    = 1; 
+            $requested_status = ($requested_rem > 0) ? 'Paid (Deducted from Loan)' : 'Paid';
 
             $sql = "INSERT INTO loan_portfolio (
                 customer_id, loan_number, loan_amount, 
@@ -331,7 +333,7 @@ function executeApproval($conn, $approval) {
                 $d['total_disbursed'], $d['interest_rate'], $d['management_fee_rate'], 
                 (bool)($d['deduct_fee_from_disbursed'] ?? 1),
                 (bool)($d['mgmt_fee_first_month_only'] ?? 0),
-                $requested_rem
+                0 // REMAINDER is now deducted from disbursement, NOT added to installments
             );
 
             // Transaction
@@ -366,8 +368,20 @@ function executeApproval($conn, $approval) {
             ]);
 
             // 2. Credit Cash/Bank (Check which one was used)
+            // Subtract any requested_rem from the payout amounts
             $cash_amt = floatval($d['cash_amount'] ?? 0);
             $bank_amt = floatval($d['bank_amount'] ?? 0);
+            
+            // Pro-rata deduction if both are used, but usually it's simple
+            if ($requested_rem > 0) {
+                if ($cash_amt >= $requested_rem) {
+                    $cash_amt -= $requested_rem;
+                } else {
+                    $rem_to_deduct = $requested_rem - $cash_amt;
+                    $cash_amt = 0;
+                    $bank_amt -= $rem_to_deduct;
+                }
+            }
             
             if ($cash_amt > 0) {
                 $c_beg = _helper_getBeginningBalance($conn, '1101', $p_date);
@@ -560,7 +574,7 @@ function executeApproval($conn, $approval) {
             }
 
             require_once __DIR__ . '/activity_logger.php';
-            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($is_paid_fully ? "PAID" : "ADDED TO INSTALLMENT"));
+            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($requested_rem > 0 ? "DEDUCTED FROM PAYOUT" : "PAID UPFRONT"));
             break;
         }
 

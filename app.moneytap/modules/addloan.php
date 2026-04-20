@@ -68,9 +68,9 @@ function parseMoney($moneyString) {
 }
 
 /**
- * Calculate management fee per month from total disbursed
+ * Calculate processing fee per month from total disbursed
  */
-function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
+function calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
     return round($total_disbursed * ($management_fee_rate / 100), 0);
 }
 
@@ -157,8 +157,8 @@ function IPMT($rate, $period, $nper, $pv) {
         $interest = round($interest / 10) * 10;
         $management_fee = round($management_fee / 10) * 10;
         
-        // Add remaining requested amount to 1st installment
-        $req_amt_this_month = ($i == 1) ? $requested_remaining : 0;
+        // Add remaining requested amount to 1st installment - REMOVED (now deducted from disbursement)
+        $req_amt_this_month = 0;
         
         $total_payment = $principal + $interest + $management_fee + $req_amt_this_month;
         $closing_balance = $opening_balance - $principal;
@@ -190,8 +190,8 @@ function IPMT($rate, $period, $nper, $pv) {
     return [
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
-        'total_management_fees' => round($total_management_fees, 2),
-        'total_payment' => round($total_principal + $total_interest + $total_management_fees + $requested_remaining, 2),
+        'total_processing_fees' => round($total_management_fees, 2),
+        'total_payment' => round($total_principal + $total_interest + $total_management_fees, 2),
         'monthly_payment' => $monthly_payment
     ];
 }
@@ -399,8 +399,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         if (empty($error_message)) {
-            $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
+            $management_fee = calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate);
             $loan_amount = calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate, $deduct_fee);
+            
+            // Subtract remaining 2% fee from the amount given to customer
+            $requested_amount_total = parseMoney($_POST['requested_amount'] ?? '0');
+            $requested_amount_paid_upfront = parseMoney($_POST['requested_amount_paid'] ?? '0');
+            $requested_amount_deduction = max(0, $requested_amount_total - $requested_amount_paid_upfront);
+            
+            $loan_amount = $loan_amount - $requested_amount_deduction;
             
             $cash_amount = parseMoney($_POST['cash_amount'] ?? '0');
             $bank_amount = parseMoney($_POST['bank_amount'] ?? '0');
@@ -447,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } elseif ($interest_rate <= 0 || $interest_rate > 100) {
                 $error_message = "Interest rate must be between 0.01% and 100%";
             } elseif ($management_fee_rate < 0 || $management_fee_rate > 100) {
-                $error_message = "Management fee rate must be between 0% and 100%";
+                $error_message = "Processing fee rate must be between 0% and 100%";
             } elseif ($number_of_instalments <= 0 || $number_of_instalments > 360) {
                 $error_message = "Number of instalments must be between 1 and 360";
             } elseif (abs(($cash_amount + $bank_amount) - $loan_amount) > 0.01) {
@@ -794,7 +801,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
                                 <strong>Total Disbursed:</strong> This is the starting balance for all payment calculations. 
-                                Choose whether to deduct management fee upfront or include it in first installment.
+                                Choose whether to deduct processing fee upfront or include it in installments.
                             </div>
                         </div>
                     </div>
@@ -815,9 +822,15 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="loan_amount" class="form-label">Amount Given to Customer (Net)</label>
-                                <input type="text" class="form-control bg-light money-display" id="loan_amount"
-                                       value="<?php echo formatMoney($default_loan_amount); ?>" readonly>
-                                <small class="text-muted">Actual cash given to customer</small>
+                                <input type="text" class="form-control bg-light money-display fw-bold" id="loan_amount"
+                                       value="<?php echo formatMoney($default_loan_amount - $requested_amount_remaining); ?>" readonly>
+                                <small class="text-muted">Actual cash given to customer (after all deductions)</small>
+                                <?php if ($requested_amount_remaining > 0): ?>
+                                    <div class="mt-1 p-1 px-2 bg-warning bg-opacity-25 border border-warning rounded small text-dark">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        Includes <strong>FRW <?php echo formatMoney($requested_amount_remaining); ?></strong> 2% fee deduction.
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -853,7 +866,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                         <?php echo (!isset($_POST['deduct_fee']) && $default_deduct_fee) || (isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="deduct_fee">
-                                        <strong>Deduct management fee from disbursed amount</strong>
+                                        <strong>Deduct processing fee from disbursed amount</strong>
                                     </label>
                                 </div>
                             </div>
@@ -866,7 +879,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                         <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
+                                        <strong>Apply Processing Fee ONLY to 1st Installment</strong>
                                     </label>
                                 </div>
                             </div>
@@ -887,7 +900,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         </div>
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label for="management_fee_rate" class="form-label">Management Fee Rate (%) <span class="text-danger">*</span></label>
+                                <label for="management_fee_rate" class="form-label">Processing Fee Rate (%) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="management_fee_rate"
                                        name="management_fee_rate" step="0.1" min="0" max="100" required
                                        value="<?php echo isset($_POST['management_fee_rate']) ? htmlspecialchars($_POST['management_fee_rate']) : number_format($default_management_fee_rate, 1, '.', ''); ?>"
@@ -971,7 +984,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                     <div class="row">
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label">Mgmt Fee/Month</label>
+                                <label class="form-label">Processing Fee/Month</label>
                                 <input type="text" class="form-control bg-light money-display" id="management_fee"
                                        value="<?php echo formatMoney($default_management_fee); ?>" readonly>
                                 <small class="text-muted" id="fee_description">Charged in months 2-<?php echo $default_instalments; ?></small>
@@ -1248,10 +1261,23 @@ function calculateFromDisbursed() {
         }
         
         if (interestRate > 0 && instalments > 0) {
-            // Simplified interest calculation for UI preview
-            const avgBalance    = totalDisbursed / 2;
-            const avgInterest   = avgBalance * (interestRate / 100);
-            const totalInterest = Math.round(avgInterest * instalments);
+            // MATCHING BACKEND LOGIC: Use a more accurate interest calculation for the summary
+            // Total Interest = Sum of (Monthly Rate * Reducing Balance)
+            // For UI, we use a slightly better approx or replicate the amortization
+            let totalInterest = 0;
+            let currentBalance = totalDisbursed;
+            const monthlyRate = interestRate / 100;
+            
+            // Simplified PMT for UI
+            const pmt = totalDisbursed * (monthlyRate * Math.pow(1 + monthlyRate, instalments)) / (Math.pow(1 + monthlyRate, instalments) - 1);
+            
+            for (let i = 1; i <= instalments; i++) {
+                let interestThisMonth = currentBalance * monthlyRate;
+                totalInterest += interestThisMonth;
+                let principalThisMonth = pmt - interestThisMonth;
+                currentBalance -= principalThisMonth;
+            }
+            totalInterest = Math.round(totalInterest / 10) * 10;
             
             let totalManagementFees = 0;
             if (firstMonthOnly) {
@@ -1262,16 +1288,28 @@ function calculateFromDisbursed() {
                     : managementFeeFull * instalments;
             }
             
-            const isRequestedUpfront = document.getElementById('is_requested_paid_upfront').type === 'checkbox' 
-                ? document.getElementById('is_requested_paid_upfront').checked 
-                : document.getElementById('is_requested_paid_upfront').value === '1';
+            const requestedAmountTotal = parseNumber(document.getElementById('requested_amount').value);
+            const requestedAmountUpfront = parseNumber(document.getElementsByName('requested_amount_paid')[0].value);
+            const requestedAmountRemaining = Math.max(0, requestedAmountTotal - requestedAmountUpfront);
             
-            const requestedAmountValue = parseNumber(document.getElementById('requested_amount').value);
+            // Net Loan Amount update in JS
+            let netPayout = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
+            netPayout -= requestedAmountRemaining;
+            document.getElementById('loan_amount').value = formatNumber(Math.round(netPayout));
             
-            const totalPayment = totalDisbursed + totalInterest + totalManagementFees + (isRequestedUpfront ? 0 : requestedAmountValue);
-            const monthlyPayment = instalments > 1
-                ? Math.round((totalDisbursed + totalInterest + totalManagementFees) / instalments)
-                : (totalDisbursed + totalInterest + totalManagementFees);
+            // Update the warning box dynamically if it exists
+            const warningBox = document.querySelector('.bg-warning.bg-opacity-25');
+            if (requestedAmountRemaining > 0) {
+                if (warningBox) {
+                    warningBox.style.display = 'block';
+                    warningBox.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Includes <strong>FRW ' + formatNumber(requestedAmountRemaining) + '</strong> 2% fee deduction.';
+                }
+            } else if (warningBox) {
+                warningBox.style.display = 'none';
+            }
+
+            const totalPayment = totalDisbursed + totalInterest + totalManagementFees;
+            const monthlyPayment = Math.round(totalPayment / instalments / 10) * 10;
             
             document.getElementById('monthly_payment').value = formatNumber(monthlyPayment);
             document.getElementById('total_interest').value  = formatNumber(totalInterest);

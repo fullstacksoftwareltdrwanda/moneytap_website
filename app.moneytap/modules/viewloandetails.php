@@ -643,12 +643,19 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
 </div>
 <div class="col-lg-6">
     <div class="card mb-3">
-        <div class="card-header bg-success text-white"><h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Loan Information</h5></div>
+        <div class="card-header bg-success text-white"><h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Loan Protocols & Details</h5></div>
         <div class="card-body">
             <table class="table table-borderless mb-0">
                 <tr><td class="info-label" width="45%">Loan Number:</td><td class="fw-bold"><?php echo htmlspecialchars(isset($loan['loan_number']) ? $loan['loan_number'] : 'N/A'); ?></td></tr>
                 <?php if (isset($loan['requested_amount']) && $loan['requested_amount'] > 0): ?>
-                <tr class="bg-primary-subtle rounded"><td class="info-label fw-bold">Requested Amount (2%):</td><td class="fw-bold text-primary">FRW <?php echo number_format($loan['requested_amount'], 2); ?> (<?php echo htmlspecialchars($loan['requested_amount_status'] ?? 'Pending'); ?>)</td></tr>
+                <?php 
+                    $req_status = $loan['requested_amount_status'] ?? 'Pending';
+                    $bg_class = (strpos($req_status, 'Deducted') !== false || strpos($req_status, 'Added') !== false || $req_status == 'Pending') ? 'bg-warning-subtle' : 'bg-primary-subtle';
+                ?>
+                <tr class="<?php echo $bg_class; ?> rounded">
+                    <td class="info-label fw-bold">Requested Amount (2%):</td>
+                    <td class="fw-bold text-dark">FRW <?php echo number_format($loan['requested_amount'], 2); ?> (<?php echo htmlspecialchars($req_status); ?>)</td>
+                </tr>
                 <?php endif; ?>
                 <tr><td class="info-label">Disbursement Amount:</td><td class="fw-bold text-primary">FRW <?php echo number_format($disbursement_amount > 0 ? $disbursement_amount : array_sum(array_column($instalments, 'principal_amount')), 2); ?></td></tr>
                 <tr class="border-top"><td class="info-label">Total Expected (Schedule):</td><td class="fw-bold">FRW <?php echo number_format($total_exp_inst > 0 ? $total_exp_inst : array_sum(array_column($instalments, 'total_amount')), 2); ?></td></tr>
@@ -668,7 +675,7 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
 <!-- Fees -->
 <?php if ($total_fees > 0): ?>
 <div class="card mb-3">
-    <div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Fees &amp; Charges</h5></div>
+    <div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Fees &amp; Ecosystem Charges</h5></div>
     <div class="card-body">
         <table class="table table-borderless mb-0">
             <?php if ($application_fees > 0): ?><tr><td class="info-label" width="35%">Application Fees:</td><td>FRW <?php echo number_format($application_fees,2); ?></td></tr><?php endif; ?>
