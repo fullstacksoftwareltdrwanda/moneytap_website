@@ -550,8 +550,8 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                     </div>
                     <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Expected Interest</h6>
                 </div>
-                <h4 class="mb-0 fw-black text-warning">FRW <?php echo number_format($loan['total_interest'] ?? 0, 0); ?></h4>
-                <div class="mt-2 small text-muted">Estimated profit from loan</div>
+                <h4 class="mb-0 fw-black text-warning">FRW <?php echo number_format($loan['total_management_fees'] ?? 0, 0); ?></h4>
+                <div class="mt-2 small text-muted">Estimated processing fee</div>
             </div>
         </div>
     </div>
@@ -781,8 +781,7 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                         <th>Due Date</th>
                         <th class="text-end">Principal</th>
                         <th class="text-end">Interest</th>
-                        <th class="text-end">Mgmt Fee</th>
-                        <th class="text-end bg-primary-subtle text-primary border-start border-end border-primary border-opacity-10" width="160">Requested Amt</th>
+                        <th class="text-end">Processing Fee</th>
                         <th class="text-end fw-black">Total Due</th>
                         <th class="text-end text-success">Paid</th>
                         <th class="text-end text-danger fw-bold pe-3">Balance</th>
@@ -802,24 +801,11 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                     <td class="text-end"><?php echo number_format($inst['principal_amount'], 0); ?></td>
                     <td class="text-end"><?php echo number_format($inst['interest_amount'], 0); ?></td>
                     <td class="text-end"><?php echo number_format($inst['fees_amount'], 0); ?></td>
-                    <td class="text-end bg-primary-subtle border-start border-end border-primary border-opacity-10 py-1">
-                        <?php if (isset($inst['requested_amount']) && $inst['requested_amount'] > 0): ?>
-                            <div class="d-flex flex-column align-items-end">
-                                <span class="badge bg-primary px-3 shadow-sm pulse-blue mb-0">
-                                    FRW <?php echo number_format($inst['requested_amount'], 0); ?>
-                                </span>
-                                <small class="text-primary fw-bold" style="font-size:0.6rem;">REQUIRED 2% FEE</small>
-                            </div>
-                        <?php else: ?>
-                            <span class="text-muted opacity-50 small">—</span>
-                        <?php endif; ?>
-                    </td>
                     <?php
-                        // Always compute total from parts so Requested Amount is always included
+                        // Always compute total from parts
                         $computed_total = floatval($inst['principal_amount'])
                                         + floatval($inst['interest_amount'])
-                                        + floatval($inst['fees_amount'])
-                                        + floatval($inst['requested_amount'] ?? 0);
+                                        + floatval($inst['fees_amount']);
                     ?>
                     <td class="text-end fw-black text-primary">FRW <?php echo number_format($computed_total, 0); ?></td>
                     <td class="text-end text-success fw-bold"><?php echo number_format($inst['amount_paid'], 0); ?></td>

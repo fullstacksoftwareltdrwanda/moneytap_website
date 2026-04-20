@@ -62,7 +62,7 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
     // Ensure Core Portfolio accounts exist in our working list
     $required_codes = [
         '1202' => ['name' => 'Requested Amount Receivable',          'class' => 'Assets',     'bal' => 'Debit'],
-        '4202' => ['name' => 'Disbursement Management Fee Income',   'class' => 'Fee Income', 'bal' => 'Credit'],
+        '4202' => ['name' => 'Disbursement Processing Fee Income',   'class' => 'Fee Income', 'bal' => 'Credit'],
         '4203' => ['name' => 'Requested Amount Income (2%)',         'class' => 'Fee Income', 'bal' => 'Credit']
     ];
     
@@ -513,7 +513,7 @@ switch ($report_type) {
         $sql_unified = "SELECT 
             c.customer_id, 
             c.customer_name,
-            -- Use the SAME capped logic as the Trial Balance for Interest, Management Fees and Penalties
+            -- Use the SAME capped logic as the Trial Balance for Interest, Processing Fees (Mgmt) and Penalties
             (SELECT SUM(CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END) 
              FROM loan_instalments li 
              JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
@@ -599,42 +599,42 @@ switch ($report_type) {
         $report_title = "Income Analysis (By Customer)";
         
         // Fetch detailed loan income data — per loan, using loan_instalments
-        // Also includes disbursement management fee from loan_portfolio
+        // Only capture if it's a "Disbursement Processing Fee" (instalment 1 processing fee is 0)o
         $analysis_sql = "SELECT 
             lp.loan_id, 
             lp.loan_number, 
             c.customer_name,
             
-            -- Paid during the selected period (CAPPED to expected if fully paid)
+            // Paid during the selected period (CAPPED to expected if fully paid)
             SUM(CASE WHEN li.payment_date BETWEEN '$start_date' AND '$query_end_date' THEN 
                  (CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END)
             ELSE 0 END) as period_interest_paid,
             
             SUM(CASE WHEN li.payment_date BETWEEN '$start_date' AND '$query_end_date' THEN 
-                 (CASE WHEN li.balance_remaining <= 0 THEN li.management_fee ELSE li.management_fee_paid END)
+                 (CASE WHEN li.balance_remaining <= 0 THEN li.processing_fee ELSE li.processing_fee_paid END)
             ELSE 0 END) as period_fee_paid,
             
             SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN 
                  li.penalty_paid
             ELSE 0 END) as period_penalty_paid,
             
-            -- Disbursement Management Fee: ONLY if upfront options are selected
-            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
-                 (CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.management_fee_amount ELSE 0 END)
+            -- Disbursement Processing Fee: ONLY if upfront options are selected
+            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.processing_fee_first_month_only = 1 THEN 
+                 (CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.processing_fee_amount ELSE 0 END)
             ELSE 0 END as disb_fee_period,
             
-            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
-                 lp.management_fee_amount
+            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.processing_fee_first_month_only = 1 THEN 
+                 lp.processing_fee_amount
             ELSE 0 END as total_disb_fee,
             
-            -- Totals to date (all payments EVER made on this loan, capped if fully paid)
+            // Totals to date (all payments EVER made on this loan, capped if fully paid)
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END) as total_interest_paid,
-            SUM(CASE WHEN li.balance_remaining <= 0 THEN li.management_fee ELSE li.management_fee_paid END) as total_fee_paid,
+            SUM(CASE WHEN li.balance_remaining <= 0 THEN li.processing_fee ELSE li.processing_fee_paid END) as total_fee_paid,
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.penalty_amount ELSE li.penalty_paid END) as total_penalty_paid,
             
-            -- Total expected for comparison
+            // Total expected for comparison
             SUM(li.interest_amount) as total_interest_exp,
-            SUM(li.management_fee) as total_fee_exp,
+            SUM(li.processing_fee) as total_fee_exp,
             SUM(li.penalty_amount) as total_penalty_exp
             
             FROM loan_portfolio lp

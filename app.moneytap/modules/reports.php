@@ -141,7 +141,7 @@ function buildPaymentsQuery($conn, $sd, $ed, $cf) {
 
     $where_lp = ["lp.disbursement_date BETWEEN '{$sd} 00:00:00' AND '{$query_ed}'"];
     if ($cf) $where_lp[] = "lp.customer_id = " . intval($cf);
-    // Only capture if it's a "Disbursement Management Fee" (instalment 1 mgmt fee is 0)
+    // Only capture if it's a "Disbursement Processing Fee" (instalment 1 processing fee is 0)
     $where_lp[] = "(SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1) = 0";
     $wc_lp = implode(' AND ', $where_lp);
 

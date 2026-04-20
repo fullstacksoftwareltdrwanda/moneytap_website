@@ -298,14 +298,14 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                         <div class="col-12 mt-5">
                             <div class="d-flex align-items-center">
                                 <hr class="flex-grow-1 op-20">
-                                <span class="px-3 small text-muted fw-bold uppercase tracking-wider">Management &
-                                    Processing Fees</span>
+                                <span class="px-3 small text-muted fw-bold uppercase tracking-wider">Processing &
+                                    Ecosystem Fees</span>
                                 <hr class="flex-grow-1 op-20">
                             </div>
                         </div>
 
                         <div class="col-md-4 mt-4">
-                            <label class="form-label fw-bold text-dark">Management Fee (%)</label>
+                            <label class="form-label fw-bold text-dark">Processing Fee (%)</label>
                             <input type="number" step="0.1" name="mgmt_fee_rate" id="mgmt_rate"
                                 class="form-control rounded-4 py-3" value="5.5" onchange="formatAndCalc()">
                         </div>

@@ -483,8 +483,8 @@ try {
                             'transaction_date' => $payment_date,
                             'class' => 'Fee Income',
                             'account_code' => '4201',
-                            'account_name' => 'Management Fee Income',
-                            'particular' => 'Management Fee - Current Instalment Only (Future Waived)',
+                            'account_name' => 'Processing Fee Income',
+                            'particular' => 'Processing Fee - Current Instalment Only (Future Waived)',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
                             'beginning_balance' => $m_beg,
@@ -767,7 +767,7 @@ try {
                             'class' => 'Fee Income',
                             'account_code' => '4201',
                             'account_name' => 'Disbursement Fee Income',
-                            'particular' => 'Management Fee',
+                            'particular' => 'Processing Fee',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
                             'beginning_balance' => $mgmt_beg,
@@ -1196,7 +1196,7 @@ endif; ?>
         </div>
         <div class="col-md-2">
             <div class="card"><div class="card-body">
-                <small class="text-muted">Management Fee</small>
+                <small class="text-muted">Processing Fee</small>
                 <!-- ✅ DYNAMIC: read from loan_portfolio.management_fee_rate -->
                 <h6 class="mb-0"><?php echo htmlspecialchars($mgmt_fee_rate_label); ?></h6>
             </div></div>
@@ -1243,8 +1243,8 @@ endif; ?>
                     <p class="text-muted small mb-0">
                         <i class="fas fa-info-circle me-1"></i>
                         The <strong>first (current) instalment</strong> is paid in full
-                        (principal + interest + management fee). All subsequent selected instalments:
-                        the borrower pays <strong>principal only</strong> &mdash; interest and management fee
+                        (principal + interest + processing fee). All subsequent selected instalments:
+                        the borrower pays <strong>principal only</strong> &mdash; interest and processing fee
                         are <strong>waived and cleared</strong>, marking those instalments as Fully Paid.
                         The <em>Amount to Pay</em> column already reflects this.
                     </p>
@@ -1548,7 +1548,7 @@ endif; ?>
                             </div>
                             <div class="payment-summary-item">
                                 <!-- ✅ DYNAMIC label rendered from PHP -->
-                                <span>Management Fee (<?php echo htmlspecialchars($mgmt_fee_rate_label); ?>):</span>
+                                <span>Processing Fee (<?php echo htmlspecialchars($mgmt_fee_rate_label); ?>):</span>
                                 <span id="summary_management">0</span>
                             </div>
                             <div id="summary_requested_container" class="payment-summary-item text-primary fw-bold" style="background:#e7f3ff; display:none;">
@@ -2073,7 +2073,7 @@ function generatePDF() {
     doc.text('Loan Number: <?php echo addslashes($loan_info['loan_number'] ?? 'N/A'); ?>', 17, 73);
     // ✅ DYNAMIC rates injected from JS constants (which were set from PHP)
     doc.text('Interest Rate: ' + LOAN_INTEREST_RATE_PCT + '%', 110, 68);
-    doc.text('Management Fee: ' + LOAN_MGMT_FEE_RATE_PCT + '%', 110, 73);
+    doc.text('Processing Fee: ' + LOAN_MGMT_FEE_RATE_PCT + '%', 110, 73);
     doc.text('Term: <?php echo $loan_info['number_of_instalments'] ?? 'N/A'; ?> months', 110, 78);
     doc.text('Start Date: <?php echo isset($loan_info['disbursement_date']) ? date('d/m/Y', strtotime($loan_info['disbursement_date'])) : 'N/A'; ?>', 110, 83);
 
@@ -2093,7 +2093,7 @@ endforeach; ?>
 
     doc.autoTable({
         startY: 90,
-        head: [['#', 'Payment Date', 'Opening Balance', 'Principal', 'Interest', 'Management Fee', 'Total Payment', 'Closing Balance']],
+        head: [['#', 'Payment Date', 'Opening Balance', 'Principal', 'Interest', 'Processing Fee', 'Total Payment', 'Closing Balance']],
         body: tableData,
         foot: [['', 'TOTALS:',
             '<?php echo number_format($loan_info['total_disbursed_amount'] ?? 0, 0); ?>',

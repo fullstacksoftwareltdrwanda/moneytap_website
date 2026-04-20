@@ -431,8 +431,8 @@ function executeApproval($conn, $approval) {
                     'transaction_date' => $p_date,
                     'class' => 'Revenue',
                     'account_code' => '4201',
-                    'account_name' => 'Management Fee Income',
-                    'particular' => 'Upfront Management Fee',
+                    'account_name' => 'Processing Fee Income',
+                    'particular' => 'Upfront Processing Fee',
                     'voucher_number' => $voucher_number,
                     'narration' => $narration,
                     'beginning_balance' => $m_beg,
@@ -511,7 +511,7 @@ function executeApproval($conn, $approval) {
                                 'class' => 'Assets',
                                 'account_code' => '1202',
                                 'account_name' => 'Requested Amount Receivable',
-                                'particular' => 'Accrued Processing Fee (Remaining)',
+                                'particular' => 'Accrued Processing Fee (Subtracted from amount given)',
                                 'voucher_number' => $voucher_number,
                                 'narration' => $narration,
                                 'beginning_balance' => $rec_beg,
@@ -556,7 +556,7 @@ function executeApproval($conn, $approval) {
                                 'class' => 'Assets',
                                 'account_code' => '1202',
                                 'account_name' => 'Requested Amount Receivable',
-                                'particular' => 'Accrued Processing Fee (Remaining)',
+                                'particular' => 'Accrued Processing Fee (Subtracted from amount given)',
                                 'voucher_number' => $voucher_number,
                                 'narration' => $narration,
                                 'beginning_balance' => $rec_beg,
@@ -574,7 +574,7 @@ function executeApproval($conn, $approval) {
             }
 
             require_once __DIR__ . '/activity_logger.php';
-            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($requested_rem > 0 ? "DEDUCTED FROM PAYOUT" : "PAID UPFRONT"));
+            logActivity($conn, 'create', 'loan', $new_loan_id, "Approved creation of loan: {$d['loan_number']} with Requested Amount " . ($requested_rem > 0 ? "Subtracted from amount given" : "PAID UPFRONT"));
             break;
         }
 
@@ -615,7 +615,7 @@ function executeApproval($conn, $approval) {
                 mgmt_fee_first_month_only = " . intval($d['mgmt_fee_first_month_only'] ?? 0) . ",
                 requested_amount = " . floatval($d['requested_amount'] ?? 0) . ",
                 is_requested_paid_upfront = " . intval($d['is_requested_paid_upfront'] ?? 0) . ",
-                requested_amount_status = '" . (($d['is_requested_paid_upfront'] ?? 0) ? 'Paid' : 'Added to Installment') . "',
+                requested_amount_status = '" . (($d['is_requested_paid_upfront'] ?? 0) ? 'Paid' : 'Subtracted from amount given') . "',
                 loan_purpose = '" . $conn->real_escape_string($d['loan_purpose'] ?? '') . "',
                 economic_center = '" . $conn->real_escape_string($d['economic_center'] ?? '') . "',
                 updated_at = NOW()
@@ -706,6 +706,7 @@ if (!function_exists('_helper_PPMT')) {
     function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0) {
         $schedule = [];
         $monthly_rate = $interest_rate / 100;
+        // Formula: Processing Fee per Month = Total Disbursed × Processing Fee Rate%;
         $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
         $opening_balance = $total_disbursed;
         

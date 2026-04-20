@@ -664,7 +664,7 @@ $default_total_payment = $schedule_data['total_payment'];
                                                  (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Management Fee ONLY to 1st Installment</strong>
+                                        <strong>Apply Processing Fee ONLY to 1st Installment</strong>
                                     </label>
                                 </div>
                             </div>
@@ -707,7 +707,7 @@ $default_total_payment = $schedule_data['total_payment'];
                         </div>
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label for="management_fee_rate" class="form-label">Management Fee Rate (%) <span class="text-danger">*</span></label>
+                                <label for="management_fee_rate" class="form-label">Processing Fee Rate (%) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="management_fee_rate"
                                        name="management_fee_rate" step="0.1" min="0" max="100" required
                                        value="<?php echo isset($_POST['management_fee_rate']) ? htmlspecialchars($_POST['management_fee_rate']) : number_format($default_management_fee_rate, 1, '.', ''); ?>"
