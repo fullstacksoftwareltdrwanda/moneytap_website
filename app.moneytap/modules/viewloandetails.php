@@ -550,8 +550,8 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                     </div>
                     <h6 class="text-muted mb-0 small uppercase fw-bold ls-1">Expected Interest</h6>
                 </div>
-                <h4 class="mb-0 fw-black text-warning">FRW <?php echo number_format($loan['total_management_fees'] ?? 0, 0); ?></h4>
-                <div class="mt-2 small text-muted">Estimated processing fee</div>
+                <h4 class="mb-0 fw-black text-warning">FRW <?php echo number_format($loan['total_interest'] ?? 0, 0); ?></h4>
+                <div class="mt-2 small text-muted">Total expected interest</div>
             </div>
         </div>
     </div>

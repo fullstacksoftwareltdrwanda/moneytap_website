@@ -633,340 +633,144 @@ try {
                     $total_payment_due = floatval($current_instalment['total_payment']);
                     $current_inst_num = intval($current_instalment['instalment_number']);
 
-                    $update_days_query = "UPDATE loan_instalments 
-                                        SET days_overdue = ?,
-                                            updated_at = NOW()
-                                        WHERE instalment_id = ?";
-                    $update_days_stmt = $conn->prepare($update_days_query);
-                    $update_days_stmt->bind_param("ii", $days_overdue, $instalment_id);
-                    $update_days_stmt->execute();
-                    $update_days_stmt->close();
-
-                    $customer_code = $loan_info['customer_code'] ?? 'UNKNOWN';
-                    $voucher_number = $customer_code;
-                    $narration = "Loan payment - Instalment #" . $instalment_number .
-                        " - Loan #" . $loan_info['loan_number'] .
-                        " - Reference: " . $payment_reference;
-
-                    if ($payment_method === 'Cash') {
-                        $debit_account_code = '1101';
-                        $debit_account_name = 'Cash on Hand';
-                    } elseif ($payment_method === 'Mobile Money') {
-                        $debit_account_code = '1103';
-                        $debit_account_name = 'Mobile Money Account';
-                    } else {
-                        $debit_account_code = '1102';
-                        $debit_account_name = 'Bank Account';
-                    }
-
-                    $debit_beginning = getBeginningBalance($conn, $debit_account_code, $payment_date);
-                    createLedgerEntry($conn, [
-                        'transaction_date' => $payment_date,
-                        'class' => 'Assets',
-                        'account_code' => $debit_account_code,
-                        'account_name' => $debit_account_name,
-                        'particular' => 'Loan Payment Received',
-                        'voucher_number' => $voucher_number,
-                        'narration' => $narration,
-                        'beginning_balance' => $debit_beginning,
-                        'debit_amount' => $actual_payment_amount,
-                        'credit_amount' => 0,
-                        'movement' => $actual_payment_amount,
-                        'ending_balance' => $debit_beginning + $actual_payment_amount,
-                        'reference_type' => 'loan_payment',
-                        'reference_id' => $instalment_id,
-                        'created_by' => $created_by
-                    ]);
-
+                    // =========================================================================
+                    // CASCADE LOGIC: Allocate payment across installments starting from current
+                    // =========================================================================
                     $remaining_to_allocate = $actual_payment_amount;
+                    $current_iter_id = $instalment_id;
+                    $processed_count = 0;
+                    
+                    // Total accumulators for ledger
+                    $total_p_pd = 0; $total_i_pd = 0; $total_m_pd = 0; $total_r_pd = 0; $total_pen_pd = 0;
 
-                    $penalty_paid = min($adjusted_penalties, $remaining_to_allocate);
-                    $remaining_to_allocate -= $penalty_paid;
+                    $voucher_number = $loan_info['customer_code'] ?? 'UNKNOWN';
+                    $narration = "Loan payment - Cascaded - Loan #" . ($loan_info['loan_number'] ?? 'N/A') . " - Ref: " . $payment_reference;
 
-                    if ($penalty_paid > 0) {
-                        $penalty_beg = getBeginningBalance($conn, '4205', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Revenue',
-                            'account_code' => '4205',
-                            'account_name' => 'Other Operating Income',
-                            'particular' => 'Penalty for Late Payment',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $penalty_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $penalty_paid,
-                            'movement' => $penalty_paid,
-                            'ending_balance' => $penalty_beg + $penalty_paid,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
+                    while ($remaining_to_allocate > 0 && $current_iter_id > 0) {
+                        $processed_count++;
+                        
+                        // Fetch the installment to process
+                        $st = $conn->prepare("SELECT * FROM loan_instalments WHERE instalment_id = ?");
+                        $st->bind_param("i", $current_iter_id);
+                        $st->execute();
+                        $inst = $st->get_result()->fetch_assoc();
+                        $st->close();
+                        if (!$inst) break;
+
+                        $due_p = max(0, floatval($inst['principal_amount']) - floatval($inst['principal_paid']));
+                        $due_i = max(0, floatval($inst['interest_amount']) - floatval($inst['interest_paid']));
+                        $due_m = max(0, floatval($inst['management_fee']) - floatval($inst['management_fee_paid']));
+                        $due_r = max(0, floatval($inst['requested_amount']) - floatval($inst['requested_amount_paid']));
+                        $due_pen_row = max(0, floatval($inst['penalty_amount'] ?? 0) - floatval($inst['penalty_paid'] ?? 0));
+                        
+                        // Apply adjusted penalties from form only to the FIRST installment clicked
+                        $due_pen = ($processed_count == 1) ? $adjusted_penalties : $due_pen_row;
+                        
+                        $total_inst_due = $due_p + $due_i + $due_m + $due_r + $due_pen;
+                        
+                        // Find NEXT installment
+                        $is_last_pending = false;
+                        $chk = $conn->prepare("SELECT instalment_id FROM loan_instalments WHERE loan_id = ? AND status NOT IN ('Fully Paid', 'Overpaid') AND instalment_number > ? ORDER BY instalment_number ASC LIMIT 1");
+                        $chk->bind_param("ii", $loan_id, $inst['instalment_number']);
+                        $chk->execute();
+                        $next_res = $chk->get_result();
+                        if ($next_res->num_rows == 0) $is_last_pending = true;
+                        $next_inst_row = $next_res->fetch_assoc();
+                        $next_id = $next_inst_row ? intval($next_inst_row['instalment_id']) : 0;
+                        $chk->close();
+
+                        // How much to apply? If last pending, take everything. Otherwise min(due, remaining)
+                        $pay_now = ($is_last_pending) ? $remaining_to_allocate : min($remaining_to_allocate, $total_inst_due);
+                        $remaining_to_allocate -= $pay_now;
+
+                        // Distribution: Penalties -> Interest -> Fee -> Requested -> Principal
+                        $rem = $pay_now;
+                        $pd_pen = min($rem, $due_pen); $rem -= $pd_pen;
+                        $pd_i   = min($rem, $due_i);   $rem -= $pd_i;
+                        $pd_m   = min($rem, $due_m);   $rem -= $pd_m;
+                        $pd_r   = min($rem, $due_r);   $rem -= $pd_r;
+                        $pd_p   = $rem; // All leftovers go to principal (even if it exceeds scheduled principal for this row)
+
+                        $total_p_pd += $pd_p; $total_i_pd += $pd_i; $total_m_pd += $pd_m; $total_r_pd += $pd_r; $total_pen_pd += $pd_pen;
+
+                        // New Status
+                        $new_bal = max(0, floatval($inst['balance_remaining']) - ($pay_now - $pd_pen));
+                        
+                        // User wants 'Overpaid' (Purple) if they pay more than the installment due
+                        if ($pay_now > $total_inst_due && $total_inst_due > 0) $stat = 'Overpaid';
+                        elseif ($new_bal <= 0) $stat = 'Fully Paid';
+                        elseif ($pay_now > 0) $stat = 'Partially Paid';
+                        else $stat = $inst['status'];
+
+                        $upd = $conn->prepare("UPDATE loan_instalments SET 
+                            paid_amount = paid_amount + ?, principal_paid = principal_paid + ?, 
+                            interest_paid = interest_paid + ?, management_fee_paid = management_fee_paid + ?, 
+                            requested_amount_paid = requested_amount_paid + ?, balance_remaining = ?, 
+                            penalty_paid = penalty_paid + ?, status = ?, payment_date = ?, updated_at = NOW() 
+                            WHERE instalment_id = ?");
+                        $inst_clean_pd = $pay_now - $pd_pen;
+                        $upd->bind_param("dddddddssi", $inst_clean_pd, $pd_p, $pd_i, $pd_m, $pd_r, $new_bal, $pd_pen, $stat, $payment_date, $current_iter_id);
+                        $upd->execute();
+                        $upd->close();
+
+                        // Record in loan_payments for history
+                        $month_str = date('F Y', strtotime($payment_date));
+                        $notes_str = "Cascaded payment. Step " . $processed_count . " | Ref: " . $payment_reference;
+                        $pmt_ins = $conn->prepare("INSERT INTO loan_payments (loan_id, loan_instalment_id, month_paid, payment_date, beginning_balance, payment_amount, interest_amount, principal_amount, monitoring_fee, penalties, payment_method, reference_number, notes, created_at, payment_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),?)");
+                        $pmt_ins->bind_param("iisssdddddssss", $loan_id, $current_iter_id, $month_str, $payment_date, $inst['balance_remaining'], $pay_now, $pd_i, $pd_p, $pd_m, $pd_pen, $payment_method, $payment_reference, $notes_str, $evidence_filename);
+                        $pmt_ins->execute();
+                        $pmt_ins->close();
+
+                        $current_iter_id = $next_id;
                     }
 
-                    $interest_paid = min($interest_amount, $remaining_to_allocate);
-                    $remaining_to_allocate -= $interest_paid;
+                    // --- Consolidated Ledger Credits --- 
+                    if ($payment_method === 'Cash') { $db_acc = '1101'; $db_name = 'Cash on Hand'; }
+                    elseif ($payment_method === 'Mobile Money') { $db_acc = '1103'; $db_name = 'Mobile Money Account'; }
+                    else { $db_acc = '1102'; $db_name = 'Bank Account'; }
 
-                    $mgmt_fee_paid = min($management_fee, $remaining_to_allocate);
-                    $remaining_to_allocate -= $mgmt_fee_paid;
+                    $db_beg = getBeginningBalance($conn, $db_acc, $payment_date);
+                    createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Assets', 'account_code' => $db_acc, 'account_name' => $db_name, 'particular' => 'Loan Payment Total', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $db_beg, 'debit_amount' => $actual_payment_amount, 'credit_amount' => 0, 'movement' => $actual_payment_amount, 'ending_balance' => $db_beg + $actual_payment_amount, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
 
-                    $req_amount_paid_now = min($requested_amount_to_pay, $remaining_to_allocate);
-                    $remaining_to_allocate -= $req_amount_paid_now;
-
-                    $principal_paid = min($principal_amount, $remaining_to_allocate);
-                    if ($remaining_to_allocate > $principal_amount) {
-                        $principal_paid = $remaining_to_allocate;
+                    if ($total_pen_pd > 0) {
+                        $beg = getBeginningBalance($conn, '4205', $payment_date);
+                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Revenue', 'account_code' => '4205', 'account_name' => 'Other Operating Income', 'particular' => 'Penalty Payment', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_pen_pd, 'movement' => $total_pen_pd, 'ending_balance' => $beg + $total_pen_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
+                    }
+                    if ($total_p_pd > 0) {
+                        $beg = getBeginningBalance($conn, '1201', $payment_date);
+                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Assets', 'account_code' => '1201', 'account_name' => 'Loans to Customers', 'particular' => 'Principal Repayment', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_p_pd, 'movement' => -$total_p_pd, 'ending_balance' => $beg - $total_p_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
+                    }
+                    if ($total_i_pd > 0) {
+                        $beg = getBeginningBalance($conn, '4101', $payment_date);
+                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Revenue', 'account_code' => '4101', 'account_name' => 'Interest Income', 'particular' => 'Interest Income', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_i_pd, 'movement' => $total_i_pd, 'ending_balance' => $beg + $total_i_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
+                    }
+                    if ($total_m_pd > 0) {
+                        $beg = getBeginningBalance($conn, '4201', $payment_date);
+                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Fee Income', 'account_code' => '4201', 'account_name' => 'Processing Fee Income', 'particular' => 'Processing Fee Payment', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_m_pd, 'movement' => $total_m_pd, 'ending_balance' => $beg + $total_m_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
+                    }
+                    if ($total_r_pd > 0) {
+                        $beg = getBeginningBalance($conn, '4203', $payment_date);
+                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Fee Income', 'account_code' => '4203', 'account_name' => 'Requested Amount Income (2%)', 'particular' => 'Requested Fee Payment', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_r_pd, 'movement' => $total_r_pd, 'ending_balance' => $beg + $total_r_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
                     }
 
-                    if ($principal_paid > 0) {
-                        $principal_beg = getBeginningBalance($conn, '1201', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Assets',
-                            'account_code' => '1201',
-                            'account_name' => 'Loans to Customers',
-                            'particular' => 'Principal Repayment',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $principal_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $principal_paid,
-                            'movement' => -$principal_paid,
-                            'ending_balance' => $principal_beg - $principal_paid,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
-                    }
+                    // Sync Portfolio totals
+                    require_once __DIR__ . '/../includes/accounting_functions.php';
+                    syncLoanPortfolio($conn, $loan_id);
 
-                    if ($interest_paid > 0) {
-                        $interest_beg = getBeginningBalance($conn, '4101', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Revenue',
-                            'account_code' => '4101',
-                            'account_name' => 'Interest on Loans',
-                            'particular' => 'Interest Income',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $interest_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $interest_paid,
-                            'movement' => $interest_paid,
-                            'ending_balance' => $interest_beg + $interest_paid,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
-                    }
-
-                    if ($mgmt_fee_paid > 0) {
-                        $mgmt_beg = getBeginningBalance($conn, '4201', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Fee Income',
-                            'account_code' => '4201',
-                            'account_name' => 'Disbursement Fee Income',
-                            'particular' => 'Processing Fee',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $mgmt_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $mgmt_fee_paid,
-                            'movement' => $mgmt_fee_paid,
-                            'ending_balance' => $mgmt_beg + $mgmt_fee_paid,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
-                    }
-
-                    if ($req_amount_paid_now > 0) {
-                        // Credit Requested Amount Income (4203)
-                        $req_inc_beg = getBeginningBalance($conn, '4203', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Fee Income',
-                            'account_code' => '4203',
-                            'account_name' => 'Requested Amount Income (2%)',
-                            'particular' => 'Requested Amount Fee Payment',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $req_inc_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $req_amount_paid_now,
-                            'movement' => $req_amount_paid_now,
-                            'ending_balance' => $req_inc_beg + $req_amount_paid_now,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
-
-                        // Credit Requested Amount Receivable (1202)
-                        $req_rec_beg = getBeginningBalance($conn, '1202', $payment_date);
-                        createLedgerEntry($conn, [
-                            'transaction_date' => $payment_date,
-                            'class' => 'Assets',
-                            'account_code' => '1202',
-                            'account_name' => 'Requested Amount Receivable',
-                            'particular' => 'Requested Amount Receivable Payment',
-                            'voucher_number' => $voucher_number,
-                            'narration' => $narration,
-                            'beginning_balance' => $req_rec_beg,
-                            'debit_amount' => 0,
-                            'credit_amount' => $req_amount_paid_now,
-                            'movement' => -$req_amount_paid_now,
-                            'ending_balance' => $req_rec_beg - $req_amount_paid_now,
-                            'reference_type' => 'loan_payment',
-                            'reference_id' => $instalment_id,
-                            'created_by' => $created_by
-                        ]);
-                    }
-
-
-                    // --- RECORD IN LOAN_PAYMENTS TABLE (Required for History & Deletion) ---
-                    $month_paid = date('F Y', strtotime($payment_date));
-                    $pmt_sql = "INSERT INTO loan_payments (
-                                    loan_id, loan_instalment_id, month_paid, payment_date, 
-                                    beginning_balance, payment_amount, interest_amount, 
-                                    principal_amount, monitoring_fee, penalties, 
-                                    payment_method, reference_number, notes, created_at,
-                                    payment_evidence
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
-                    $pmt_stmt = $conn->prepare($pmt_sql);
-                    $pmt_notes = "Recorded via Record Payment module. Narration: " . $narration;
-                    $pmt_stmt->bind_param("iisssdddddssss",
-                        $loan_id,
-                        $instalment_id,
-                        $month_paid,
-                        $payment_date,
-                        $current_balance,
-                        $actual_payment_amount,
-                        $interest_paid,
-                        $principal_paid,
-                        $mgmt_fee_paid,
-                        $penalty_paid,
-                        $payment_method,
-                        $payment_reference,
-                        $pmt_notes,
-                        $evidence_filename
-                    );
-                    $pmt_stmt->execute();
-                    $pmt_stmt->close();
-
-                    $total_paid = $actual_payment_amount - $penalty_paid;
-                    $new_balance_remaining = max(0, $current_balance - $total_paid);
-
-                    // --- ROUNDING TOLERANCE ---
-                    // If the remaining balance is very small (e.g. less than 1.0), 
-                    // we treat it as paid to handle penny rounding differences.
-                    if ($new_balance_remaining > 0 && $new_balance_remaining < 1.0) {
-                        $new_balance_remaining = 0;
-                    }
-
-                    if ($new_balance_remaining <= 0) {
-                        $new_status = 'Fully Paid';
-                    }
-                    elseif ($new_balance_remaining < $total_payment_due) {
-                        $new_status = 'Partially Paid';
-                    }
-                    else {
-                        $new_status = 'Pending';
-                    }
-
-                    // Calculate the ACTUAL closing balance after the principal payment
-                    $actual_closing_balance_for_row = max(0, $current_opening - $principal_paid);
-
-                    $update_instalment_query = "UPDATE loan_instalments 
-                                            SET paid_amount          = paid_amount + ?,
-                                                principal_paid       = principal_paid + ?,
-                                                interest_paid        = interest_paid + ?,
-                                                management_fee_paid  = management_fee_paid + ?,
-                                                requested_amount_paid = requested_amount_paid + ?,
-                                                balance_remaining    = ?,
-                                                closing_balance      = ?,
-                                                penalty_paid         = penalty_paid + ?,
-                                                status               = ?,
-                                                days_overdue         = ?,
-                                                payment_date         = ?,
-                                                updated_at           = NOW()
-                                            WHERE instalment_id = ?";
-                    $update_stmt = $conn->prepare($update_instalment_query);
-                    $update_stmt->bind_param("ddddddddsisi",
-                        $total_paid,
-                        $principal_paid,
-                        $interest_paid,
-                        $mgmt_fee_paid,
-                        $req_amount_paid_now,
-                        $new_balance_remaining,
-                        $actual_closing_balance_for_row,
-                        $penalty_paid,
-                        $new_status,
-                        $days_overdue,
-                        $payment_date,
-                        $instalment_id
-                    );
-                    $update_stmt->execute();
-                    $update_stmt->close();
-
-                    // --- LOAN PORTFOLIO SYNC ---
-                    // Automatically update summary totals in loan_portfolio
-                    $portfolio_sync = "UPDATE loan_portfolio SET 
-                                        total_paid = total_paid + ?,
-                                        total_principal_paid = total_principal_paid + ?,
-                                        total_interest_paid = total_interest_paid + ?,
-                                        total_management_fees_paid = total_management_fees_paid + ?,
-                                        principal_outstanding = principal_outstanding - ?,
-                                        interest_outstanding = interest_outstanding - ?,
-                                        total_outstanding = principal_outstanding + interest_outstanding,
-                                        updated_at = NOW()
-                                      WHERE loan_id = ?";
-                    $port_stmt = $conn->prepare($portfolio_sync);
-                    $port_stmt->bind_param("ddddddi",
-                        $actual_payment_amount,
-                        $principal_paid,
-                        $interest_paid,
-                        $mgmt_fee_paid,
-                        $principal_paid,
-                        $interest_paid,
-                        $loan_id
-                    );
-                    $port_stmt->execute();
-                    $port_stmt->close();
-
-                    // --- EARLY REPAYMENT / SCHEDULE RECALCULATION ---
-
-                    // Trigger recalculation for the rest of the schedule
-                    if ($total_paid > $current_balance + 1) {
-                        recalculateRemainingSchedule($conn, $loan_id, $current_inst_num, $actual_closing_balance_for_row, $interest_rate, $mgmt_fee_rate);
-                    } else {
-                        syncLoanPortfolio($conn, $loan_id);
-                    }
-
-                    $check_pending_stmt = $conn->prepare(
-                        "SELECT COUNT(*) AS pending_count FROM loan_instalments 
-                         WHERE loan_id = ? AND status != 'Fully Paid'"
-                    );
-                    $check_pending_stmt->bind_param("i", $loan_id);
-                    $check_pending_stmt->execute();
-                    $pending_result = $check_pending_stmt->get_result()->fetch_assoc();
-                    $check_pending_stmt->close();
-
-                    if (intval($pending_result['pending_count']) === 0) {
-                        $close_loan_stmt = $conn->prepare(
-                            "UPDATE loan_portfolio SET loan_status = 'Closed', updated_at = NOW() WHERE loan_id = ?"
-                        );
-                        $close_loan_stmt->bind_param("i", $loan_id);
-                        $close_loan_stmt->execute();
-                        $close_loan_stmt->close();
+                    // Final Check for Close
+                    $chk_closed = $conn->prepare("SELECT COUNT(*) as pending FROM loan_instalments WHERE loan_id = ? AND status NOT IN ('Fully Paid', 'Overpaid')");
+                    $chk_closed->bind_param("i", $loan_id);
+                    $chk_closed->execute();
+                    $res_c = $chk_closed->get_result()->fetch_assoc();
+                    if (intval($res_c['pending']) == 0) {
+                        $conn->query("UPDATE loan_portfolio SET loan_status = 'Closed', updated_at = NOW() WHERE loan_id = $loan_id");
                     }
 
                     $conn->commit();
 
-                    $_SESSION['success_message'] = "Payment recorded successfully! Amount: " . number_format($actual_payment_amount, 0);
+                    $_SESSION['success_message'] = "Payment recorded successfully! Amount: " . number_format($actual_payment_amount, 0) . " cascaded across processed instalments.";
                     header("Location: " . $_SERVER['PHP_SELF'] . "?page=recordpayment&loan_id=" . $loan_id);
                     exit();
-
                 }
                 catch (Exception $e) {
                     $conn->rollback();
@@ -1046,8 +850,9 @@ $mgmt_fee_rate_label = formatRateLabel($mgmt_fee_rate_pct);
             border-bottom: 1px solid #e9ecef;
         }
         .status-fully-paid    { background-color: #d4edda !important; }
-        .status-partially-paid{ background-color: #fff3cd !important; }
+        .status-partially-paid{ background-color: #ffe5e5 !important; } /* Pink as requested */
         .status-pending       { background-color: #ffffff !important; }
+        .status-overpaid      { background-color: #e2d9f3 !important; border-left: 5px solid #6f42c1 !important; }
         tbody tr:hover { opacity: 0.9; }
         .clickable-row { cursor: pointer; }
 
@@ -1196,7 +1001,7 @@ endif; ?>
         </div>
         <div class="col-md-2">
             <div class="card"><div class="card-body">
-                <small class="text-muted">Processing Fee</small>
+                <small class="text-muted">Ecosystem Charges</small>
                 <!-- ✅ DYNAMIC: read from loan_portfolio.management_fee_rate -->
                 <h6 class="mb-0"><?php echo htmlspecialchars($mgmt_fee_rate_label); ?></h6>
             </div></div>
@@ -1265,7 +1070,7 @@ endif; ?>
                                                 <th class="text-end">Outstanding</th>
                                                 <th class="text-end">Principal Due</th>
                                                 <th class="text-end">Interest</th>
-                                                <th class="text-end">Mgmt Fee</th>
+                                                <th class="text-end">Proc. Fee</th>
                                                 <th class="text-center">Type</th>
                                                 <th class="text-end">Amount to Pay</th>
                                             </tr>
@@ -1395,6 +1200,8 @@ endif; ?>
 
         if ($status === 'Fully Paid')
             $row_class = 'status-fully-paid';
+        elseif ($status === 'Overpaid')
+            $row_class = 'status-overpaid';
         elseif ($status === 'Partially Paid')
             $row_class = 'status-partially-paid';
         else
@@ -1425,18 +1232,8 @@ endif; ?>
                                     <td class="text-end"><?php echo number_format($principal, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($interest, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($mgmt_fee, 0); ?></td>
-                                    <td class="text-end fw-bold text-primary" style="background:#e7f3ff;"><?php echo $req_amount > 0 ? number_format($req_amount, 0) : '—'; ?></td>
                                     <td class="text-end">
-                                        <?php 
-                                            if ($req_amount > 0) {
-                                                echo '<div class="d-flex flex-column align-items-end">';
-                                                echo '<span class="badge bg-info text-dark mb-1" style="font-size: 0.65rem;">+ ' . number_format($req_amount, 0) . ' (2% Fee)</span>';
-                                                echo '<span class="fw-bold">FRW ' . number_format($total_payment, 0) . '</span>';
-                                                echo '</div>';
-                                            } else {
-                                                echo number_format($total_payment, 0);
-                                            }
-                                        ?>
+                                        <?php echo number_format($total_payment, 0); ?>
                                     </td>
                                     <td class="text-end"><?php echo number_format($closing_balance, 0); ?></td>
                                 </tr>
@@ -1450,13 +1247,11 @@ endif; ?>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'principal_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'interest_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'management_fee')), 0); ?></th>
-                                    <th class="text-end text-primary"><?php echo number_format(array_sum(array_column($existing_instalments, 'requested_amount')), 0); ?></th>
                                     <th class="text-end"><?php 
                                         $grand_p = array_sum(array_column($existing_instalments, 'principal_amount'));
                                         $grand_i = array_sum(array_column($existing_instalments, 'interest_amount'));
                                         $grand_m = array_sum(array_column($existing_instalments, 'management_fee'));
-                                        $grand_r = array_sum(array_column($existing_instalments, 'requested_amount'));
-                                        echo number_format($grand_p + $grand_i + $grand_m + $grand_r, 0); 
+                                        echo number_format($grand_p + $grand_i + $grand_m, 0); 
                                     ?></th>
                                     <th class="text-end">-</th>
                                 </tr>

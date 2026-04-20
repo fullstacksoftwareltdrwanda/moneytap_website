@@ -711,9 +711,14 @@ if (!function_exists('_helper_PPMT')) {
         $opening_balance = $total_disbursed;
         
         for ($i = 1; $i <= $term; $i++) {
-            $interest = round($opening_balance * $monthly_rate, 2);
-            $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
+            $interest = round($opening_balance * $monthly_rate, 0);
+            $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 0);
             
+            // Catch up on last installment
+            if ($i == $term) {
+                $principal = $opening_balance;
+            }
+
             if ($first_month_only) {
                 $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
             } else {
@@ -723,22 +728,18 @@ if (!function_exists('_helper_PPMT')) {
             // Requested Amount logic: only added to Month 1 if provided (not paid upfront)
             $requested_fee = ($i == 1) ? $requested_amount : 0;
             
-            $principal = round($principal / 10) * 10;
-            $interest = round($interest / 10) * 10;
-            $management_fee = round($management_fee / 10) * 10;
-            
             $total_payment = $principal + $interest + $management_fee + $requested_fee;
             $closing_balance = max(0, $opening_balance - $principal);
             
             $schedule[] = [
                 'instalment_number' => $i,
-                'opening_balance' => round($opening_balance, 2),
+                'opening_balance' => round($opening_balance, 0),
                 'principal' => $principal,
                 'interest' => $interest,
                 'management_fee' => $management_fee,
                 'requested_amount' => $requested_fee,
                 'total_payment' => $total_payment,
-                'closing_balance' => round($closing_balance, 2)
+                'closing_balance' => round($closing_balance, 0)
             ];
             $opening_balance = $closing_balance;
         }

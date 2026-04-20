@@ -61,7 +61,6 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
 
     // Ensure Core Portfolio accounts exist in our working list
     $required_codes = [
-        '1202' => ['name' => 'Requested Amount Receivable',          'class' => 'Assets',     'bal' => 'Debit'],
         '4202' => ['name' => 'Disbursement Processing Fee Income',   'class' => 'Fee Income', 'bal' => 'Credit'],
         '4203' => ['name' => 'Requested Amount Income (2%)',         'class' => 'Fee Income', 'bal' => 'Credit']
     ];
@@ -87,8 +86,9 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
         $normal_balance = $account['normal_balance'];
         $first_digit = substr($account_code, 0, 1);
         
-        // Filter out specifically "Deferred VAT" accounts as requested
+        // Filter out specific accounts as requested (1202, 4201 and Deferred VAT)
         if ($account_code === '2403' || $account_code === '2406' || 
+            $account_code === '1202' || $account_code === '4201' ||
             stripos($account_name, 'Deferred VAT') !== false) {
             continue;
         }
@@ -161,11 +161,10 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
                 $lp_rem_move = floatval(mysqli_fetch_assoc($res_lp_move_rem)['mp'] ?? 0);
                 
                 $period_credit = roundAmount($req_paid_move + $lp_rem_move);
-            } elseif (in_array($account_code, ['4101', '4201', '4205'])) {
+            } elseif (in_array($account_code, ['4101', '4205'])) {
                 // Accounts from loan_instalments table
                 $exp_col = ''; $paid_col = '';
                 if ($account_code === '4101') { $exp_col = 'interest_amount'; $paid_col = 'interest_paid'; }
-                elseif ($account_code === '4201') { $exp_col = 'management_fee'; $paid_col = 'management_fee_paid'; }
                 elseif ($account_code === '4205') { $exp_col = ''; $paid_col = 'penalty_paid'; }
                 $calc_field = $exp_col ? "CASE WHEN balance_remaining <= 0 THEN $exp_col ELSE $paid_col END" : "$paid_col";
                 $res_open = mysqli_query($conn, "SELECT SUM($calc_field) as op FROM loan_instalments WHERE payment_date < '$start_date 00:00:00'");
@@ -519,10 +518,8 @@ switch ($report_type) {
              JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
              WHERE lp2.customer_id = c.customer_id AND li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59') as int_pd,
             
-            (SELECT SUM(CASE WHEN li.balance_remaining <= 0 THEN li.management_fee ELSE li.management_fee_paid END) 
-             FROM loan_instalments li 
-             JOIN loan_portfolio lp2 ON li.loan_id = lp2.loan_id 
-             WHERE lp2.customer_id = c.customer_id AND li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59') as mgmt_pd,
+            -- (Management Fee pd logic removed as requested)
+            0 as mgmt_pd,
             
             (SELECT SUM(li.penalty_paid) 
              FROM loan_instalments li 
@@ -556,7 +553,7 @@ switch ($report_type) {
             
             COALESCE((SELECT lp3.interest_outstanding FROM loan_portfolio lp3 WHERE lp3.customer_id = c.customer_id AND lp3.loan_status != 'Closed' ORDER BY lp3.loan_id DESC LIMIT 1), 0) as int_bal,
             COALESCE((SELECT lp3.principal_outstanding FROM loan_portfolio lp3 WHERE lp3.customer_id = c.customer_id AND lp3.loan_status != 'Closed' ORDER BY lp3.loan_id DESC LIMIT 1), 0) as princ_bal,
-            COALESCE((SELECT lp3.management_fee_amount - lp3.total_management_fees_paid FROM loan_portfolio lp3 WHERE lp3.customer_id = c.customer_id AND lp3.loan_status != 'Closed' ORDER BY lp3.loan_id DESC LIMIT 1), 0) as mgmt_bal
+            0 as mgmt_bal
             FROM customers c
             ORDER BY c.customer_name";
             
@@ -605,7 +602,7 @@ switch ($report_type) {
             lp.loan_number, 
             c.customer_name,
             
-            // Paid during the selected period (CAPPED to expected if fully paid)
+            -- Paid during the selected period (CAPPED to expected if fully paid)
             SUM(CASE WHEN li.payment_date BETWEEN '$start_date' AND '$query_end_date' THEN 
                  (CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END)
             ELSE 0 END) as period_interest_paid,
@@ -627,12 +624,12 @@ switch ($report_type) {
                  lp.processing_fee_amount
             ELSE 0 END as total_disb_fee,
             
-            // Totals to date (all payments EVER made on this loan, capped if fully paid)
+            -- Totals to date (all payments EVER made on this loan, capped if fully paid)
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END) as total_interest_paid,
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.processing_fee ELSE li.processing_fee_paid END) as total_fee_paid,
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.penalty_amount ELSE li.penalty_paid END) as total_penalty_paid,
             
-            // Total expected for comparison
+            -- Total expected for comparison
             SUM(li.interest_amount) as total_interest_exp,
             SUM(li.processing_fee) as total_fee_exp,
             SUM(li.penalty_amount) as total_penalty_exp
@@ -693,6 +690,8 @@ switch ($report_type) {
             background-color: #e9ecef;
             font-weight: bold;
         }
+        .status-fully-paid    { background-color: #d4edda !important; }
+        .status-partially-paid{ background-color: #ffe5e5 !important; } /* Pink as requested */
         .total-row {
             background-color: #f8f9fa !important;
             font-weight: bold;
@@ -1572,7 +1571,6 @@ switch ($report_type) {
                                                         <tr style="font-size: 0.65rem;">
                                                             <th></th>
                                                             <th class="text-end">Interest</th>
-                                                            <th class="text-end">Periodic Mgmt</th>
                                                             <th class="text-end">Disbursement</th>
                                                             <th class="text-end">Requested (2%)</th>
                                                             <th class="text-end">App Fee</th>
@@ -1593,7 +1591,6 @@ switch ($report_type) {
                                                         <tr>
                                                             <td><?php echo htmlspecialchars($r['customer_name']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['int_pd']); ?></td>
-                                                            <td class="text-end"><?php echo formatMoney($r['mgmt_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['disb_pd']); ?></td>
                                                             <td class="text-end text-primary fw-bold"><?php echo formatMoney($r['req_pd']); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($r['app_pd']); ?></td>
@@ -1608,7 +1605,6 @@ switch ($report_type) {
                                                         <tr>
                                                             <td>TOTALS</td>
                                                             <td class="text-end"><?php echo formatMoney($gt_int); ?></td>
-                                                            <td class="text-end"><?php echo formatMoney($gt_mgmt); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_disb); ?></td>
                                                             <td class="text-end text-primary"><?php echo formatMoney($gt_req); ?></td>
                                                             <td class="text-end"><?php echo formatMoney($gt_app); ?></td>

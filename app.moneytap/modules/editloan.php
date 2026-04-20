@@ -34,7 +34,7 @@ function parseMoney($moneyString) {
  * Formula: Management Fee per Month = Total Disbursed × Management Fee Rate%
  * This fee is charged EVERY MONTH except the first month
  */
-function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
+function calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate = 5.5) {
     return round($total_disbursed * ($management_fee_rate / 100), 0);
 }
 
@@ -44,7 +44,7 @@ function calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_r
  */
 function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($deduct_fee) {
-        $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
+        $management_fee = calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate);
         return round($total_disbursed - $management_fee, 0);
     } else {
         return round($total_disbursed, 0);
@@ -170,7 +170,7 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
     return [
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
-        'total_management_fees' => round($total_management_fees, 2),
+        'total_processing_fees' => round($total_management_fees, 2),
         'total_payment' => round($total_principal + $total_interest + $total_management_fees, 2),
         'monthly_payment' => $monthly_payment
     ];
@@ -258,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // CALCULATE from Total Disbursed using custom management fee rate
         $deduct_fee = isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1';
         $mgmt_fee_first_month_only = isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1';
-        $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
+        $management_fee = calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate);
         $loan_amount = calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate, $deduct_fee);
         
         $cash_amount = parseMoney($_POST['cash_amount'] ?? '0');
@@ -343,7 +343,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 // Generate loan schedule using TOTAL DISBURSED and custom rates
                                 $schedule_data = generateLoanSchedule($total_disbursed, $interest_rate, $number_of_instalments, $management_fee_rate, $deduct_fee, $mgmt_fee_first_month_only);
                                 $total_interest = $schedule_data['total_interest'];
-                                $total_management_fees = $schedule_data['total_management_fees'];
+                                $total_management_fees = $schedule_data['total_processing_fees'] ?? 0;
                                 $total_payment = $schedule_data['total_payment'];
                                 $monthly_payment = $schedule_data['monthly_payment'];
                                 
@@ -523,14 +523,14 @@ function createTransactionRecord($conn, $loan_id, $loan_number, $type, $date, $a
 $default_management_fee_rate = floatval($loan['management_fee_rate'] ?? 5.5);
 $default_total_disbursed = floatval($loan['total_disbursed']);
 $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate);
-$default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
+$default_management_fee = calculateProcessingFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
 
 $deduct_fee_default = (isset($loan['deduct_fee_from_disbursed']) && $loan['deduct_fee_from_disbursed'] == '1');
 $first_month_only_default = (isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1');
 $schedule_data = generateLoanSchedule($default_total_disbursed, $loan['interest_rate'], $loan['number_of_instalments'], $default_management_fee_rate, $deduct_fee_default, $first_month_only_default);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
-$default_total_management_fees = $schedule_data['total_management_fees'];
+$default_total_management_fees = $schedule_data['total_processing_fees'] ?? 0;
 $default_total_payment = $schedule_data['total_payment'];
 ?>
 

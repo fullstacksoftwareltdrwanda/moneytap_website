@@ -318,7 +318,7 @@ $requested_amount_remaining = max(0, $default_requested_amount - $default_reques
 $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_requested_paid);
 $default_monthly_payment = $schedule_data['monthly_payment'];
 $default_total_interest = $schedule_data['total_interest'];
-$default_total_management_fees = $schedule_data['total_management_fees'];
+$default_total_management_fees = $schedule_data['total_processing_fees'] ?? 0;
 $default_total_payment = $schedule_data['total_payment'];
 
 // ── OVERRIDE DEFAULTS IF REQUEST EXISTS ────────────────────────────────────
@@ -340,7 +340,7 @@ if ($request_data) {
     $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_requested_paid);
     $default_monthly_payment = $schedule_data['monthly_payment'];
     $default_total_interest = $schedule_data['total_interest'];
-    $default_total_management_fees = $schedule_data['total_management_fees'];
+    $default_total_management_fees = $schedule_data['total_processing_fees'] ?? 0;
     $default_total_payment = $schedule_data['total_payment'];
     $default_loan_purpose = $request_data['loan_purpose'] ?? '';
     $default_economic_center = $request_data['economic_center'] ?? '';
@@ -866,7 +866,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                         <?php echo (!isset($_POST['deduct_fee']) && $default_deduct_fee) || (isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1') ? 'checked' : ''; ?>
                                         onchange="calculateFromDisbursed()">
                                     <label class="form-check-label" for="deduct_fee">
-                                        <strong>Deduct processing fee from disbursed amount</strong>
+                                        <strong>Deduct monthly processing fee from disbursed amount (Upfront Month 1)</strong>
                                     </label>
                                 </div>
                             </div>
@@ -922,7 +922,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                                 <div class="fw-bold text-success">- FRW <?php echo formatMoney($default_requested_paid); ?></div>
                                             </div>
                                             <div class="col-12 mt-2 pt-2 border-top">
-                                                <small class="text-muted d-block uppercase" style="font-size: 0.65rem;">To be added to 1st Installment:</small>
+                                                <small class="text-muted d-block uppercase" style="font-size: 0.65rem;">Net Payout Deduction:</small>
                                                 <div class="h5 fw-black text-danger">FRW <?php echo formatMoney($requested_amount_remaining); ?></div>
                                             </div>
                                         </div>
@@ -931,7 +931,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                     <input type="hidden" name="requested_amount_paid" value="<?php echo formatMoney($default_requested_paid); ?>">
                                     <input type="hidden" name="is_requested_paid_upfront" id="is_requested_paid_upfront" value="<?php echo ($requested_amount_remaining <= 0) ? '1' : '0'; ?>">
                                 <?php else: ?>
-                                    <label for="requested_amount" class="form-label text-primary"><strong>Requested Amount (2%)</strong></label>
+                                    <label for="requested_amount" class="form-label text-primary"><strong>Ecosystem Charges (2%)</strong></label>
                                     <div class="input-group">
                                         <input type="text" class="form-control money-input bg-light" id="requested_amount"
                                                name="requested_amount" readonly
@@ -987,7 +987,7 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                                 <label class="form-label">Processing Fee/Month</label>
                                 <input type="text" class="form-control bg-light money-display" id="management_fee"
                                        value="<?php echo formatMoney($default_management_fee); ?>" readonly>
-                                <small class="text-muted" id="fee_description">Charged in months 2-<?php echo $default_instalments; ?></small>
+                                <small class="text-muted" id="fee_description">Processing fee applied to monthlies.</small>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1242,7 +1242,7 @@ function calculateFromDisbursed() {
         
         // Only calculate requested amount if NOT linked to a request
         <?php if (!$request_data): ?>
-            const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Requested Amount
+            const requestedAmountFull = Math.round(totalDisbursed * 0.02); // 2% Ecosystem Charges
             document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
         <?php endif; ?>
         
@@ -1253,11 +1253,11 @@ function calculateFromDisbursed() {
         
         const feeDesc = document.getElementById('fee_description');
         if (firstMonthOnly) {
-            feeDesc.textContent = 'Fee applied ONLY to 1st installment. Months 2-' + instalments + ' = 0 fee.';
+            feeDesc.textContent = 'Processing fee applied ONLY to 1st installment (One-time).';
         } else {
             feeDesc.textContent = deductFee
-                ? 'Fee deducted upfront. No fee in first installment.'
-                : 'Fee included in all installments except Month 1 (deduct fee unchecked).';
+                ? 'Processing fee for Month 1 subtracted from disbursement. Months 2+ monthly.'
+                : 'Processing fee included in all installments (Recurring).';
         }
         
         if (interestRate > 0 && instalments > 0) {
@@ -1302,7 +1302,7 @@ function calculateFromDisbursed() {
             if (requestedAmountRemaining > 0) {
                 if (warningBox) {
                     warningBox.style.display = 'block';
-                    warningBox.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Includes <strong>FRW ' + formatNumber(requestedAmountRemaining) + '</strong> 2% fee deduction.';
+                    warningBox.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Includes <strong>FRW ' + formatNumber(requestedAmountRemaining) + '</strong> Ecosystem Charges (2%) deduction.';
                 }
             } else if (warningBox) {
                 warningBox.style.display = 'none';
