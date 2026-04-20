@@ -709,7 +709,7 @@ try {
                             penalty_paid = penalty_paid + ?, status = ?, payment_date = ?, updated_at = NOW() 
                             WHERE instalment_id = ?");
                         $inst_clean_pd = $pay_now - $pd_pen;
-                        $upd->bind_param("dddddddssi", $inst_clean_pd, $pd_p, $pd_i, $pd_m, $pd_r, $new_bal, $pd_pen, $stat, $payment_date, $current_iter_id);
+                        $upd->bind_param("dddddddssi", $pay_now, $pd_p, $pd_i, $pd_m, $pd_r, $new_bal, $pd_pen, $stat, $payment_date, $current_iter_id);
                         $upd->execute();
                         $upd->close();
 
@@ -1268,7 +1268,7 @@ endif; ?>
                                 <div class="mt-2">
                                     <small class="text-muted d-block">
                                         <span class="badge" style="background-color:#d4edda;color:#155724;">■</span> Fully Paid
-                                        <span class="badge ms-2" style="background-color:#fff3cd;color:#856404;">■</span> Partially Paid
+                                        <span class="badge ms-2" style="background-color:#ffe5e5;color:#dc3545;border:1px solid #ffcccc;">■</span> Partially Paid
                                         <span class="badge ms-2" style="background-color:#ffffff;color:#000;border:1px solid #dee2e6;">■</span> Pending
                                     </small>
                                 </div>

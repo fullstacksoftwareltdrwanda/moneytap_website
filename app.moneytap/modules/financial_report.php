@@ -88,7 +88,7 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
         
         // Filter out specific accounts as requested (1202, 4201 and Deferred VAT)
         if ($account_code === '2403' || $account_code === '2406' || 
-            $account_code === '1202' || $account_code === '4201' ||
+            $account_code === '1202' || $account_code === '4201' || $account_code === '4204' ||
             stripos($account_name, 'Deferred VAT') !== false) {
             continue;
         }
