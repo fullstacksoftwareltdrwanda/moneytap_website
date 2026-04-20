@@ -696,11 +696,19 @@ try {
                         // New Status
                         $new_bal = max(0, floatval($inst['balance_remaining']) - ($pay_now - $pd_pen));
                         
-                        // User wants 'Overpaid' (Purple) if they pay more than the installment due
-                        if ($pay_now > $total_inst_due && $total_inst_due > 0) $stat = 'Overpaid';
-                        elseif ($new_bal <= 0) $stat = 'Fully Paid';
-                        elseif ($pay_now > 0) $stat = 'Partially Paid';
-                        else $stat = $inst['status'];
+                        // Status Logic:
+                        // 1. If we have money left over after paying this row -> Overpaid (Purple)
+                        // 2. If balance is 0 -> Fully Paid (Green)
+                        // 3. If we paid something but balance > 0 -> Partially Paid (Orange)
+                        if ($remaining_to_allocate > $total_inst_due && $total_inst_due > 0) {
+                            $stat = 'Overpaid';
+                        } elseif ($new_bal <= 0.01) {
+                            $stat = 'Fully Paid';
+                        } elseif ($pay_now > 0.01) {
+                            $stat = 'Partially Paid';
+                        } else {
+                            $stat = $inst['status'];
+                        }
 
                         $upd = $conn->prepare("UPDATE loan_instalments SET 
                             paid_amount = paid_amount + ?, principal_paid = principal_paid + ?, 
@@ -849,10 +857,11 @@ $mgmt_fee_rate_label = formatRateLabel($mgmt_fee_rate_pct);
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #e9ecef;
         }
-        .status-fully-paid    { background-color: #d4edda !important; }
-        .status-partially-paid{ background-color: #ffe5e5 !important; } /* Pink as requested */
+        .status-fully-paid    { background-color: #28a745 !important; color: #fff !important; } /* Green */
+        .status-partially-paid{ background-color: #fd7e14 !important; color: #fff !important; } /* Orange */
+        .status-overdue       { background-color: #dc3545 !important; color: #fff !important; } /* Red */
         .status-pending       { background-color: #ffffff !important; }
-        .status-overpaid      { background-color: #e2d9f3 !important; border-left: 5px solid #6f42c1 !important; }
+        .status-overpaid      { background-color: #6f42c1 !important; color: #fff !important; } /* Purple */
         tbody tr:hover { opacity: 0.9; }
         .clickable-row { cursor: pointer; }
 
@@ -1197,11 +1206,12 @@ endif; ?>
         // *** CHANGED: penalty now uses fixed 5% rate instead of $mgmt_fee_rate (5.5%) ***
         $penalties = $days_overdue > 0 ? (($balance * 0.05) / 30) * $days_overdue : 0;
         $final_payment = $balance + $penalties;
-
         if ($status === 'Fully Paid')
             $row_class = 'status-fully-paid';
         elseif ($status === 'Overpaid')
             $row_class = 'status-overpaid';
+        elseif ($days_overdue > 0 && $status !== 'Fully Paid' && $status !== 'Overpaid')
+            $row_class = 'status-overdue';
         elseif ($status === 'Partially Paid')
             $row_class = 'status-partially-paid';
         else
@@ -1267,8 +1277,10 @@ endif; ?>
                                 </small>
                                 <div class="mt-2">
                                     <small class="text-muted d-block">
-                                        <span class="badge" style="background-color:#d4edda;color:#155724;">■</span> Fully Paid
-                                        <span class="badge ms-2" style="background-color:#ffe5e5;color:#dc3545;border:1px solid #ffcccc;">■</span> Partially Paid
+                                        <span class="badge" style="background-color:#28a745;color:#fff;">■</span> Fully Paid
+                                        <span class="badge ms-2" style="background-color:#fd7e14;color:#fff;">■</span> Partially Paid (Orange)
+                                        <span class="badge ms-2" style="background-color:#dc3545;color:#fff;">■</span> Overdue
+                                        <span class="badge ms-2" style="background-color:#6f42c1;color:#fff;">■</span> Overpaid (Purple)
                                         <span class="badge ms-2" style="background-color:#ffffff;color:#000;border:1px solid #dee2e6;">■</span> Pending
                                     </small>
                                 </div>
