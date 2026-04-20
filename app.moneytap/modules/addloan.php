@@ -79,7 +79,7 @@ function calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_r
  */
 function calculateLoanAmountFromDisbursed($total_disbursed, $management_fee_rate = 5.5, $deduct_fee = true) {
     if ($deduct_fee) {
-        $management_fee = calculateManagementFeeFromDisbursed($total_disbursed, $management_fee_rate);
+        $management_fee = calculateProcessingFeeFromDisbursed($total_disbursed, $management_fee_rate);
         return round($total_disbursed - $management_fee, 0);
     } else {
         return round($total_disbursed, 0);
@@ -307,7 +307,7 @@ $default_management_fee_rate = 5.5;
 $default_requested_amount_rate = 2.0; // New 2% Requested Amount
 $default_deduct_fee = true;
 $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
-$default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
+$default_management_fee = calculateProcessingFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
 $default_requested_amount = round($default_total_disbursed * ($default_requested_amount_rate / 100), 0);
 $default_rate = 5.0;
 $default_instalments = 6;
@@ -335,7 +335,7 @@ if ($request_data) {
     
     // Re-calc dependent defaults
     $default_loan_amount = calculateLoanAmountFromDisbursed($default_total_disbursed, $default_management_fee_rate, $default_deduct_fee);
-    $default_management_fee = calculateManagementFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
+    $default_management_fee = calculateProcessingFeeFromDisbursed($default_total_disbursed, $default_management_fee_rate);
     
     $schedule_data = generateLoanSchedule($default_total_disbursed, $default_rate, $default_instalments, $default_management_fee_rate, $default_deduct_fee, false, $default_requested_amount, $default_requested_paid);
     $default_monthly_payment = $schedule_data['monthly_payment'];
