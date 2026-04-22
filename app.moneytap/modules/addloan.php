@@ -171,7 +171,7 @@ function IPMT($rate, $period, $nper, $pv) {
     return [
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
-        'total_processing_fees' => 0,
+        'total_management_fees' => 0,
         'total_payment' => round($total_principal + $total_interest, 2),
         'monthly_payment' => $monthly_payment
     ];

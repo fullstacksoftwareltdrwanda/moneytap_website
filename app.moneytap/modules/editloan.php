@@ -102,48 +102,32 @@ function IPMT($rate, $period, $nper, $pv) {
  */
 function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false) {
     $schedule = [];
-    $monthly_rate = $interest_rate / 100;
+    $monthly_interest_rate = $interest_rate / 100;
     
-    // Calculate management fee
-    $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
+    // Flat interest: always based on initial total disbursed
+    $fixed_monthly_interest = round($total_disbursed * $monthly_interest_rate, 2);
+    $fixed_monthly_principal = round($total_disbursed / $term, 2);
     
-    // Start with TOTAL DISBURSED as opening balance
     $opening_balance = $total_disbursed;
     $total_interest = 0;
-    $total_management_fees = 0;
     $total_principal = 0;
     
     for ($i = 1; $i <= $term; $i++) {
-        // Calculate interest on opening balance
-        $interest = round($opening_balance * $monthly_rate, 2);
+        $interest = $fixed_monthly_interest;
         $total_interest += $interest;
         
-        // Calculate principal using PPMT formula
-        $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
+        $principal = $fixed_monthly_principal;
         
-        // Fee Logic
-        if ($first_month_only) {
-            $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
-        } else {
-            if ($i == 1) {
-                $management_fee = $deduct_fee ? 0 : $management_fee_full;
-            } else {
-                $management_fee = $management_fee_full;
-            }
+        // Catch up on last installment
+        if ($i == $term) {
+            $principal = $opening_balance;
         }
         
-        if ($management_fee > 0) {
-            $total_management_fees += $management_fee;
-        }
-        
-        $principal = round($principal / 10) * 10;
-        $interest = round($interest / 10) * 10;
-        $management_fee = round($management_fee / 10) * 10;
+        // Management fees are now strictly upfront
+        $management_fee = 0;
         
         $total_payment = $principal + $interest + $management_fee;
-        $closing_balance = $opening_balance - $principal;
-        
-        if ($closing_balance < 0.01) $closing_balance = 0;
+        $closing_balance = max(0, $opening_balance - $principal);
         
         $total_principal += $principal;
         
@@ -160,18 +144,13 @@ function generateLoanSchedule($total_disbursed, $interest_rate, $term, $manageme
         $opening_balance = $closing_balance;
     }
     
-    // Calculate average monthly payment (excluding first and last)
-    $middle_payments = [];
-    for ($i = 1; $i < count($schedule) - 1; $i++) {
-        $middle_payments[] = $schedule[$i]['total_payment'];
-    }
-    $monthly_payment = count($middle_payments) > 0 ? round(array_sum($middle_payments) / count($middle_payments), 2) : 0;
+    $monthly_payment = count($schedule) > 0 ? $schedule[0]['total_payment'] : 0;
     
     return [
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
-        'total_processing_fees' => round($total_management_fees, 2),
-        'total_payment' => round($total_principal + $total_interest + $total_management_fees, 2),
+        'total_management_fees' => 0,
+        'total_payment' => round($total_principal + $total_interest, 2),
         'monthly_payment' => $monthly_payment
     ];
 }
