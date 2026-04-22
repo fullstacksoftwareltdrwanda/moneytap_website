@@ -120,50 +120,35 @@ function IPMT($rate, $period, $nper, $pv) {
 }
 
     function generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0, $requested_amount_paid = 0) {
-    if ($requested_amount_paid >= $requested_amount) {
-        $requested_remaining = 0;
-    } else {
-        $requested_remaining = $requested_amount - $requested_amount_paid;
-    }
     $schedule = [];
-    $monthly_rate = $interest_rate / 100;
-    $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
+    $monthly_interest_rate = $interest_rate / 100;
+    
+    // Flat interest: always based on initial total disbursed
+    $fixed_monthly_interest = round($total_disbursed * $monthly_interest_rate, 2);
+    $fixed_monthly_principal = round($total_disbursed / $term, 2);
+    
     $opening_balance = $total_disbursed;
     $total_interest = 0;
     $total_management_fees = 0;
     $total_principal = 0;
     
     for ($i = 1; $i <= $term; $i++) {
-        $interest = round($opening_balance * $monthly_rate, 2);
+        $interest = $fixed_monthly_interest;
         $total_interest += $interest;
-        $principal = round(-PPMT($monthly_rate, $i, $term, $total_disbursed), 2);
         
-        // Fee Logic
-        if ($first_month_only) {
-            $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
-        } else {
-            if ($i == 1) {
-                $management_fee = $deduct_fee ? 0 : $management_fee_full;
-            } else {
-                $management_fee = $management_fee_full;
-            }
+        $principal = $fixed_monthly_principal;
+        
+        // Catch up on last installment
+        if ($i == $term) {
+            $principal = $opening_balance;
         }
         
-        if ($management_fee > 0) {
-            $total_management_fees += $management_fee;
-        }
+        // Management fees are now strictly upfront (deducted from disbursement), 
+        // so we set them to 0 in installments.
+        $management_fee = 0;
         
-        $principal = round($principal / 10) * 10;
-        $interest = round($interest / 10) * 10;
-        $management_fee = round($management_fee / 10) * 10;
-        
-        // Add remaining requested amount to 1st installment - REMOVED (now deducted from disbursement)
-        $req_amt_this_month = 0;
-        
-        $total_payment = $principal + $interest + $management_fee + $req_amt_this_month;
-        $closing_balance = $opening_balance - $principal;
-        
-        if ($closing_balance < 0.01) $closing_balance = 0;
+        $total_payment = $principal + $interest + $management_fee;
+        $closing_balance = max(0, $opening_balance - $principal);
         
         $total_principal += $principal;
         
@@ -173,7 +158,7 @@ function IPMT($rate, $period, $nper, $pv) {
             'principal' => $principal,
             'interest' => $interest,
             'management_fee' => $management_fee,
-            'requested_amount' => $req_amt_this_month,
+            'requested_amount' => 0,
             'total_payment' => $total_payment,
             'closing_balance' => round($closing_balance, 2)
         ];
@@ -181,17 +166,13 @@ function IPMT($rate, $period, $nper, $pv) {
         $opening_balance = $closing_balance;
     }
     
-    $middle_payments = [];
-    for ($i = 1; $i < count($schedule) - 1; $i++) {
-        $middle_payments[] = $schedule[$i]['total_payment'];
-    }
-    $monthly_payment = count($middle_payments) > 0 ? round(array_sum($middle_payments) / count($middle_payments), 2) : 0;
+    $monthly_payment = count($schedule) > 0 ? $schedule[0]['total_payment'] : 0;
     
     return [
         'schedule' => $schedule,
         'total_interest' => round($total_interest, 2),
-        'total_processing_fees' => round($total_management_fees, 2),
-        'total_payment' => round($total_principal + $total_interest + $total_management_fees, 2),
+        'total_processing_fees' => 0,
+        'total_payment' => round($total_principal + $total_interest, 2),
         'monthly_payment' => $monthly_payment
     ];
 }
@@ -798,10 +779,10 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
 
                     <div class="row">
                         <div class="col-md-12">
-                            <div class="alert alert-info">
+                            <div class="alert alert-info border-0 shadow-sm rounded-4">
                                 <i class="fas fa-info-circle me-2"></i>
-                                <strong>Total Disbursed:</strong> This is the starting balance for all payment calculations. 
-                                Choose whether to deduct processing fee upfront or include it in installments.
+                                <strong>Flat Interest Model:</strong> Interest is calculated based on the initial principal. 
+                                Processing fees and Ecosystem charges are <strong>strictly deducted upfront</strong> from the disbursement.
                             </div>
                         </div>
                     </div>
@@ -858,33 +839,9 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="deduct_fee" name="deduct_fee" value="1"
-                                        <?php echo (!isset($_POST['deduct_fee']) && $default_deduct_fee) || (isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="deduct_fee">
-                                        <strong>Deduct monthly processing fee from disbursed amount (Upfront Month 1)</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
-                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Processing Fee ONLY to 1st Installment</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <input type="hidden" name="deduct_fee" value="1">
+                    <input type="hidden" name="mgmt_fee_first_month_only" value="0">
+                    <input type="hidden" name="mgmt_fee_is_disbursed" value="0">
 
                     
                     <div class="row">
@@ -984,10 +941,10 @@ $form_topup_type = isset($_POST['topup_type'])  ? htmlspecialchars($_POST['topup
                     <div class="row">
                         <div class="col-md-3">
                             <div class="mb-3">
-                                <label class="form-label">Processing Fee/Month</label>
-                                <input type="text" class="form-control bg-light money-display" id="management_fee"
+                                <label class="form-label">Upfront Processing Fee</label>
+                                <input type="text" class="form-control bg-light money-display fw-bold text-danger" id="management_fee"
                                        value="<?php echo formatMoney($default_management_fee); ?>" readonly>
-                                <small class="text-muted" id="fee_description">Processing fee applied to monthlies.</small>
+                                <small class="text-muted" id="fee_description">Deducted once from disbursement.</small>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1226,16 +1183,12 @@ function formatDMY(date) {
     return d + '/' + m + '/' + y;
 }
 
-// -------------------------------------------------------
-// Loan calculation
-// -------------------------------------------------------
 function calculateFromDisbursed() {
     const totalDisbursed    = parseNumber(document.getElementById('total_disbursed').value) || 0;
     const interestRate      = parseFloat(document.getElementById('interest_rate').value) || 0;
     const managementFeeRate = parseFloat(document.getElementById('management_fee_rate').value) || 0;
     const instalments       = parseInt(document.getElementById('number_of_instalments').value) || 1;
     const deductFee         = document.getElementById('deduct_fee').checked;
-    const firstMonthOnly    = document.getElementById('mgmt_fee_first_month_only').checked;
     
     if (totalDisbursed > 0) {
         const managementFeeFull = Math.round(totalDisbursed * (managementFeeRate / 100));
@@ -1246,74 +1199,47 @@ function calculateFromDisbursed() {
             document.getElementById('requested_amount').value = formatNumber(requestedAmountFull);
         <?php endif; ?>
         
-        let loanAmount = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
+        const requestedAmountTotal = parseNumber(document.getElementById('requested_amount').value);
+        const requestedAmountUpfront = parseNumber(document.getElementsByName('requested_amount_paid')[0].value);
+        const requestedAmountRemaining = Math.max(0, requestedAmountTotal - requestedAmountUpfront);
         
-        document.getElementById('loan_amount').value    = formatNumber(loanAmount);
+        // Total Payout = Total Disbursed - Management Fee (if deducted) - Ecosystem Charge (Requested Amount Remainder)
+        let netPayout = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
+        netPayout -= requestedAmountRemaining;
+        
+        document.getElementById('loan_amount').value    = formatNumber(Math.round(netPayout));
         document.getElementById('management_fee').value = formatNumber(managementFeeFull);
         
-        const feeDesc = document.getElementById('fee_description');
-        if (firstMonthOnly) {
-            feeDesc.textContent = 'Processing fee applied ONLY to 1st installment (One-time).';
-        } else {
-            feeDesc.textContent = deductFee
-                ? 'Processing fee for Month 1 subtracted from disbursement. Months 2+ monthly.'
-                : 'Processing fee included in all installments (Recurring).';
-        }
+        document.getElementById('fee_description').textContent = 'Processing fees and Ecosystem charges are deducted upfront from the disbursement.';
         
         if (interestRate > 0 && instalments > 0) {
-            // MATCHING BACKEND LOGIC: Use a more accurate interest calculation for the summary
-            // Total Interest = Sum of (Monthly Rate * Reducing Balance)
-            // For UI, we use a slightly better approx or replicate the amortization
-            let totalInterest = 0;
-            let currentBalance = totalDisbursed;
-            const monthlyRate = interestRate / 100;
+            // FLAT INTEREST CALCULATION
+            const monthlyInterest = totalDisbursed * (interestRate / 100);
+            const totalInterest = Math.round(monthlyInterest * instalments);
             
-            // Simplified PMT for UI
-            const pmt = totalDisbursed * (monthlyRate * Math.pow(1 + monthlyRate, instalments)) / (Math.pow(1 + monthlyRate, instalments) - 1);
+            // Management fees are 0 in installments now (strictly upfront)
+            const totalManagementFees = 0;
             
-            for (let i = 1; i <= instalments; i++) {
-                let interestThisMonth = currentBalance * monthlyRate;
-                totalInterest += interestThisMonth;
-                let principalThisMonth = pmt - interestThisMonth;
-                currentBalance -= principalThisMonth;
-            }
-            totalInterest = Math.round(totalInterest / 10) * 10;
-            
-            let totalManagementFees = 0;
-            if (firstMonthOnly) {
-                totalManagementFees = managementFeeFull;
-            } else {
-                totalManagementFees = deductFee
-                    ? managementFeeFull * (instalments - 1)
-                    : managementFeeFull * instalments;
-            }
-            
-            const requestedAmountTotal = parseNumber(document.getElementById('requested_amount').value);
-            const requestedAmountUpfront = parseNumber(document.getElementsByName('requested_amount_paid')[0].value);
-            const requestedAmountRemaining = Math.max(0, requestedAmountTotal - requestedAmountUpfront);
-            
-            // Net Loan Amount update in JS
-            let netPayout = deductFee ? totalDisbursed - managementFeeFull : totalDisbursed;
-            netPayout -= requestedAmountRemaining;
-            document.getElementById('loan_amount').value = formatNumber(Math.round(netPayout));
-            
-            // Update the warning box dynamically if it exists
-            const warningBox = document.querySelector('.bg-warning.bg-opacity-25');
-            if (requestedAmountRemaining > 0) {
-                if (warningBox) {
-                    warningBox.style.display = 'block';
-                    warningBox.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Includes <strong>FRW ' + formatNumber(requestedAmountRemaining) + '</strong> Ecosystem Charges (2%) deduction.';
-                }
-            } else if (warningBox) {
-                warningBox.style.display = 'none';
-            }
-
             const totalPayment = totalDisbursed + totalInterest + totalManagementFees;
-            const monthlyPayment = Math.round(totalPayment / instalments / 10) * 10;
+            const monthlyPayment = Math.round(totalPayment / instalments);
             
             document.getElementById('monthly_payment').value = formatNumber(monthlyPayment);
             document.getElementById('total_interest').value  = formatNumber(totalInterest);
             document.getElementById('total_payment').value   = formatNumber(totalPayment);
+            
+            // Update the warning box dynamically
+            const warningBox = document.querySelector('.bg-warning.bg-opacity-25');
+            if (requestedAmountRemaining > 0 || (deductFee && managementFeeFull > 0)) {
+                if (warningBox) {
+                    warningBox.style.display = 'block';
+                    let msg = '<i class="fas fa-exclamation-triangle me-1"></i> Deductions: ';
+                    if (deductFee) msg += '<strong>FRW ' + formatNumber(managementFeeFull) + '</strong> Processing Fee. ';
+                    if (requestedAmountRemaining > 0) msg += '<strong>FRW ' + formatNumber(requestedAmountRemaining) + '</strong> Ecosystem Charges (2%).';
+                    warningBox.innerHTML = msg;
+                }
+            } else if (warningBox) {
+                warningBox.style.display = 'none';
+            }
         }
     }
 }

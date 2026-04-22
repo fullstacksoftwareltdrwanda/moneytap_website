@@ -705,41 +705,41 @@ if (!function_exists('_helper_PPMT')) {
     }
     function _helper_generateLoanSchedule($total_disbursed, $interest_rate, $term, $management_fee_rate = 5.5, $deduct_fee = true, $first_month_only = false, $requested_amount = 0) {
         $schedule = [];
-        $monthly_rate = $interest_rate / 100;
-        // Formula: Processing Fee per Month = Total Disbursed × Processing Fee Rate%;
-        $management_fee_full = round($total_disbursed * ($management_fee_rate / 100), 0);
+        $monthly_interest_rate = $interest_rate / 100;
+        
+        // Flat interest: always based on initial total disbursed
+        $fixed_monthly_interest = round($total_disbursed * $monthly_interest_rate, 2);
+        $fixed_monthly_principal = round($total_disbursed / $term, 2);
+        
         $opening_balance = $total_disbursed;
         
         for ($i = 1; $i <= $term; $i++) {
-            $interest = round($opening_balance * $monthly_rate, 0);
-            $principal = round(-_helper_PPMT($monthly_rate, $i, $term, $total_disbursed), 0);
+            $interest = $fixed_monthly_interest;
+            $principal = $fixed_monthly_principal;
             
             // Catch up on last installment
             if ($i == $term) {
                 $principal = $opening_balance;
             }
 
-            if ($first_month_only) {
-                $management_fee = ($i == 1 && !$deduct_fee) ? $management_fee_full : 0;
-            } else {
-                $management_fee = ($i == 1 && $deduct_fee) ? 0 : $management_fee_full;
-            }
+            // Management fees are upfront now
+            $management_fee = 0;
 
-            // Requested Amount logic: only added to Month 1 if provided (not paid upfront)
-            $requested_fee = ($i == 1) ? $requested_amount : 0;
+            // Requested Amount logic: handled upfront now
+            $requested_fee = 0;
             
             $total_payment = $principal + $interest + $management_fee + $requested_fee;
             $closing_balance = max(0, $opening_balance - $principal);
             
             $schedule[] = [
                 'instalment_number' => $i,
-                'opening_balance' => round($opening_balance, 0),
+                'opening_balance' => round($opening_balance, 2),
                 'principal' => $principal,
                 'interest' => $interest,
                 'management_fee' => $management_fee,
                 'requested_amount' => $requested_fee,
                 'total_payment' => $total_payment,
-                'closing_balance' => round($closing_balance, 0)
+                'closing_balance' => round($closing_balance, 2)
             ];
             $opening_balance = $closing_balance;
         }

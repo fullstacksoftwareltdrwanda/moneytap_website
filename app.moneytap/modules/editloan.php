@@ -597,7 +597,8 @@ $default_total_payment = $schedule_data['total_payment'];
                         <div class="col-md-12">
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
-                                <strong>Total Disbursed:</strong> This is the starting balance for all payment calculations. Management fee is charged monthly except month 1.
+                                <strong>Flat Interest Model:</strong> Interest is calculated based on the initial principal. 
+                                Processing fees and Ecosystem charges are <strong>strictly deducted upfront</strong> from the disbursement.
                             </div>
                         </div>
                     </div>
@@ -630,46 +631,13 @@ $default_total_payment = $schedule_data['total_payment'];
                                 <input type="text" class="form-control bg-light money-display" id="requested_amount" 
                                        name="requested_amount" readonly
                                        value="<?php echo formatMoney($loan['requested_amount'] ?? 0); ?>">
-                                <div class="form-check mt-1">
-                                    <input class="form-check-input" type="checkbox" id="is_requested_paid_upfront" name="is_requested_paid_upfront" value="1"
-                                        <?php echo (isset($_POST['is_requested_paid_upfront']) && $_POST['is_requested_paid_upfront'] == '1') || 
-                                                 (!isset($_POST['is_requested_paid_upfront']) && isset($loan['is_requested_paid_upfront']) && $loan['is_requested_paid_upfront'] == '1') ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-success" for="is_requested_paid_upfront">
-                                        <small><strong>Paid Upfront (Asset)</strong></small>
-                                    </label>
-                                </div>
+                                <input type="hidden" name="is_requested_paid_upfront" value="1">
                             </div>
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="deduct_fee" name="deduct_fee" value="1"
-                                        <?php echo (isset($_POST['deduct_fee']) && $_POST['deduct_fee'] == '1') || 
-                                                 (!isset($_POST['deduct_fee']) && isset($loan['deduct_fee_from_disbursed']) && $loan['deduct_fee_from_disbursed'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="deduct_fee">
-                                        <strong>Deduct management fee from disbursed amount</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mgmt_fee_first_month_only" name="mgmt_fee_first_month_only" value="1"
-                                        <?php echo (isset($_POST['mgmt_fee_first_month_only']) && $_POST['mgmt_fee_first_month_only'] == '1') ||
-                                                 (!isset($_POST['mgmt_fee_first_month_only']) && isset($loan['mgmt_fee_first_month_only']) && $loan['mgmt_fee_first_month_only'] == '1') ? 'checked' : ''; ?>
-                                        onchange="calculateFromDisbursed()">
-                                    <label class="form-check-label" for="mgmt_fee_first_month_only">
-                                        <strong>Apply Processing Fee ONLY to 1st Installment</strong>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <input type="hidden" name="deduct_fee" id="deduct_fee" value="1">
+                    <input type="hidden" name="mgmt_fee_first_month_only" id="mgmt_fee_first_month_only" value="0">
                     
                     <div class="row">
                         <div class="col-md-6">

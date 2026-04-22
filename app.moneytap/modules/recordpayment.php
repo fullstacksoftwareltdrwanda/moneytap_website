@@ -589,7 +589,7 @@ try {
             $payment_method = $_POST['payment_method'] ?? '';
             $principal_amount = floatval($_POST['principal_amount'] ?? 0);
             $interest_amount = floatval($_POST['interest_amount'] ?? 0);
-            $management_fee = floatval($_POST['management_fee'] ?? 0);
+            $management_fee = 0;
             $requested_amount_to_pay = floatval($_POST['requested_amount_value'] ?? 0);
 
             $days_overdue = intval($_POST['days_overdue'] ?? 0);
@@ -1057,9 +1057,9 @@ endif; ?>
                     <p class="text-muted small mb-0">
                         <i class="fas fa-info-circle me-1"></i>
                         The <strong>first (current) instalment</strong> is paid in full
-                        (principal + interest + processing fee). All subsequent selected instalments:
-                        the borrower pays <strong>principal only</strong> &mdash; interest and processing fee
-                        are <strong>waived and cleared</strong>, marking those instalments as Fully Paid.
+                        (principal + interest). All subsequent selected instalments:
+                        the borrower pays <strong>principal only</strong> &mdash; interest is
+                        <strong>waived and cleared</strong>, marking those instalments as Fully Paid.
                         The <em>Amount to Pay</em> column already reflects this.
                     </p>
                 </div>
@@ -1079,7 +1079,6 @@ endif; ?>
                                                 <th class="text-end">Outstanding</th>
                                                 <th class="text-end">Principal Due</th>
                                                 <th class="text-end">Interest</th>
-                                                <th class="text-end">Proc. Fee</th>
                                                 <th class="text-center">Type</th>
                                                 <th class="text-end">Amount to Pay</th>
                                             </tr>
@@ -1087,8 +1086,8 @@ endif; ?>
                                         <tbody id="prepayTbody"></tbody>
                                         <tfoot>
                                             <tr class="table-secondary fw-bold">
-                                                <td colspan="8" class="text-end">
-                                                    Total to Collect (interest &amp; fees on future instalments waived):
+                                                <td colspan="7" class="text-end">
+                                                    Total to Collect (interest on future instalments waived):
                                                 </td>
                                                 <td class="text-end" id="prepayFooterTotal" style="color:#6f42c1;">0</td>
                                             </tr>
@@ -1179,7 +1178,6 @@ endif; ?>
                                     <th class="text-end">Opening Balance</th>
                                     <th class="text-end">Principal</th>
                                     <th class="text-end">Interest</th>
-                                    <th class="text-end">Processing Fee</th>
                                     <th class="text-end">Total Payment</th>
                                     <th class="text-end">Closing Balance</th>
                                 </tr>
@@ -1192,10 +1190,10 @@ endif; ?>
         $opening_balance = floatval($inst['opening_balance']);
         $principal = floatval($inst['principal_amount']);
         $interest = floatval($inst['interest_amount']);
-        $mgmt_fee = floatval($inst['management_fee']);
-        $req_amount = floatval($inst['requested_amount'] ?? 0);
+        $mgmt_fee = 0; // Strictly 0 for display
+        $req_amount = 0; // Strictly 0 for display
         // Total payment no longer includes requested_amount in schedule
-        $total_payment = $principal + $interest + $mgmt_fee;
+        $total_payment = $principal + $interest;
         $closing_balance = floatval($inst['closing_balance']);
         $paid_amount = floatval($inst['paid_amount']);
         $balance = floatval($inst['balance_remaining']);
@@ -1226,7 +1224,6 @@ endif; ?>
                                     data-principal="<?php echo $principal; ?>"
                                     data-interest="<?php echo $interest; ?>"
                                     data-management-fee="<?php echo $mgmt_fee; ?>"
-                                    data-requested-amount="<?php echo $req_amount; ?>"
                                     data-total-payment="<?php echo $total_payment; ?>"
                                     data-closing-balance="<?php echo $closing_balance; ?>"
                                     data-balance="<?php echo $balance; ?>"
@@ -1241,7 +1238,6 @@ endif; ?>
                                     <td class="text-end"><?php echo number_format($opening_balance, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($principal, 0); ?></td>
                                     <td class="text-end"><?php echo number_format($interest, 0); ?></td>
-                                    <td class="text-end"><?php echo number_format($mgmt_fee, 0); ?></td>
                                     <td class="text-end">
                                         <?php echo number_format($total_payment, 0); ?>
                                     </td>
@@ -1256,12 +1252,10 @@ endif; ?>
                                     <th class="text-end"><?php echo number_format($loan_info['total_disbursed'] ?? $loan_info['loan_amount'] ?? 0, 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'principal_amount')), 0); ?></th>
                                     <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'interest_amount')), 0); ?></th>
-                                    <th class="text-end"><?php echo number_format(array_sum(array_column($existing_instalments, 'management_fee')), 0); ?></th>
                                     <th class="text-end"><?php 
                                         $grand_p = array_sum(array_column($existing_instalments, 'principal_amount'));
                                         $grand_i = array_sum(array_column($existing_instalments, 'interest_amount'));
-                                        $grand_m = array_sum(array_column($existing_instalments, 'management_fee'));
-                                        echo number_format($grand_p + $grand_i + $grand_m, 0); 
+                                        echo number_format($grand_p + $grand_i, 0); 
                                     ?></th>
                                     <th class="text-end">-</th>
                                 </tr>
@@ -1324,8 +1318,8 @@ endif; ?>
                     <input type="hidden" id="instalment_number"   name="instalment_number">
                     <input type="hidden" id="principal_amount"    name="principal_amount">
                     <input type="hidden" id="interest_amount"     name="interest_amount">
-                    <input type="hidden" id="management_fee"      name="management_fee">
-                    <input type="hidden" id="requested_amount_value" name="requested_amount_value">
+                    <input type="hidden" id="management_fee"      name="management_fee" value="0">
+                    <input type="hidden" id="requested_amount_value" name="requested_amount_value" value="0">
                     
                     <div class="row">
                         <div class="col-md-6 border-end">
@@ -1353,15 +1347,8 @@ endif; ?>
                                 <span>Interest (<?php echo htmlspecialchars($interest_rate_label); ?>):</span>
                                 <span id="summary_interest">0</span>
                             </div>
-                            <div class="payment-summary-item">
-                                <!-- ✅ DYNAMIC label rendered from PHP -->
-                                <span>Processing Fee (<?php echo htmlspecialchars($mgmt_fee_rate_label); ?>):</span>
-                                <span id="summary_management">0</span>
-                            </div>
-                            <div id="summary_requested_container" class="payment-summary-item text-primary fw-bold" style="background:#e7f3ff; display:none;">
-                                <span>Requested Amount (2%):</span>
-                                <span id="summary_requested">0</span>
-                            </div>
+
+
                             <div class="payment-summary-item" style="border-top:2px solid #000;background:#e7f3ff;">
                                 <strong>Total Due:</strong>
                                 <strong id="summary_total">0</strong>
@@ -1614,8 +1601,6 @@ function openCheckoutModal(row) {
     document.getElementById('summary_opening').textContent    = formatNumber(openingBalance);
     document.getElementById('summary_principal').textContent  = formatNumber(principal);
     document.getElementById('summary_interest').textContent   = formatNumber(interest);
-    document.getElementById('summary_management').textContent = formatNumber(managementFee);
-    
     if (requestedAmount > 0) {
         document.getElementById('summary_requested').textContent = formatNumber(requestedAmount);
         document.getElementById('summary_requested_container').style.display = 'flex';
@@ -1696,9 +1681,6 @@ function buildPrepayTable() {
         const interestCell = isCurrent
             ? formatNumber(inst.interest_due)
             : '<span class="text-decoration-line-through text-muted">' + formatNumber(inst.interest_due) + '</span>';
-        const feeCell = isCurrent
-            ? formatNumber(inst.fee_due)
-            : '<span class="text-decoration-line-through text-muted">' + formatNumber(inst.fee_due) + '</span>';
 
         const tr = document.createElement('tr');
         tr.className         = 'prepay-row ' + (isCurrent ? 'selected-current' : '');
@@ -1720,7 +1702,6 @@ function buildPrepayTable() {
             '<td class="text-end">'     + formatNumber(inst.balance)      + '</td>' +
             '<td class="text-end">'     + formatNumber(inst.principal_due) + '</td>' +
             '<td class="text-end">'     + interestCell                    + '</td>' +
-            '<td class="text-end">'     + feeCell                         + '</td>' +
             '<td class="text-center">'  + badge                           + '</td>' +
             '<td class="text-end fw-bold">' + formatNumber(amountDue)     + '</td>';
 
@@ -1789,9 +1770,8 @@ function recalcPrepayTotal() {
     let breakdown = '';
     if (currentInstId && futureCount > 0) {
         breakdown = 'Current (full) + ' + futureCount + ' future instalment(s) — principal only';
-        if (waivedInterest > 0 || waivedFees > 0) {
-            breakdown += ' | Waived → Interest: ' + formatNumber(waivedInterest) +
-                         ', Fees: ' + formatNumber(waivedFees);
+        if (waivedInterest > 0) {
+            breakdown += ' | Waived → Interest: ' + formatNumber(waivedInterest);
         }
     } else if (currentInstId) {
         breakdown = 'Current instalment — full payment';

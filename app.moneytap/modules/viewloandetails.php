@@ -647,23 +647,26 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
         <div class="card-body">
             <table class="table table-borderless mb-0">
                 <tr><td class="info-label" width="45%">Loan Number:</td><td class="fw-bold"><?php echo htmlspecialchars(isset($loan['loan_number']) ? $loan['loan_number'] : 'N/A'); ?></td></tr>
-                <?php if (isset($loan['requested_amount']) && $loan['requested_amount'] > 0): ?>
-                <?php 
-                    $req_status = $loan['requested_amount_status'] ?? 'Pending';
-                    $bg_class = (strpos($req_status, 'Deducted') !== false || strpos($req_status, 'Added') !== false || $req_status == 'Pending') ? 'bg-warning-subtle' : 'bg-primary-subtle';
-                ?>
-                <tr class="<?php echo $bg_class; ?> rounded">
-                    <td class="info-label fw-bold">Requested Amount (2%):</td>
-                    <td class="fw-bold text-dark">FRW <?php echo number_format($loan['requested_amount'], 2); ?> (<?php echo htmlspecialchars($req_status); ?>)</td>
+                <tr class="bg-primary-subtle rounded">
+                    <td class="info-label fw-bold">Amount Given to Customer (Net):</td>
+                    <td class="fw-bold text-dark">FRW <?php 
+                        $net_given = $disbursement_amount;
+                        // Deduct upfront fees if they were taken from disbursement
+                        // In the new model, total_disbursed is the principal, but the actual cash given is less.
+                        // We store the cash_amount + bank_amount in loan_portfolio.
+                        $actual_cash = floatval($loan['cash_amount'] ?? 0) + floatval($loan['bank_amount'] ?? 0);
+                        echo number_format($actual_cash, 2); 
+                    ?></td>
                 </tr>
-                <?php endif; ?>
-                <tr><td class="info-label">Disbursement Amount:</td><td class="fw-bold text-primary">FRW <?php echo number_format($disbursement_amount > 0 ? $disbursement_amount : array_sum(array_column($instalments, 'principal_amount')), 2); ?></td></tr>
-                <tr class="border-top"><td class="info-label">Total Expected (Schedule):</td><td class="fw-bold">FRW <?php echo number_format($total_exp_inst > 0 ? $total_exp_inst : array_sum(array_column($instalments, 'total_amount')), 2); ?></td></tr>
-                <tr><td class="info-label">Already Paid:</td><td class="fw-bold text-success">FRW <?php echo number_format($total_paid, 2); ?></td></tr>
-                <tr><td class="info-label">Penalties Paid:</td><td class="text-danger">FRW <?php echo number_format($sum_penalties_paid,2); ?></td></tr>
-                <tr class="bg-light shadow-sm"><td class="info-label fw-bold">Outstanding Balance:</td><td class="fw-bold text-danger" style="font-size:1.15rem;">FRW <?php echo number_format($final_outstanding,2); ?></td></tr>
+                <tr><td colspan="2" class="small text-muted px-2">Actual cash given to customer after all deductions (Processing Fees & Ecosystem Charges).</td></tr>
+                
+                <tr><td class="info-label">Principal Amount:</td><td class="fw-bold text-primary">FRW <?php echo number_format($disbursement_amount, 2); ?></td></tr>
+                <tr class="border-top"><td class="info-label">Total Expected Repayment:</td><td class="fw-bold">FRW <?php echo number_format($total_exp_inst, 2); ?></td></tr>
+                <tr><td class="info-label">Already Repaid:</td><td class="fw-bold text-success">FRW <?php echo number_format($total_paid, 2); ?></td></tr>
+                <tr><td class="info-label">Penalties Paid:</td><td class="text-danger">FRW <?php echo number_format($sum_penalties_paid, 2); ?></td></tr>
+                <tr class="bg-light shadow-sm"><td class="info-label fw-bold">Outstanding Balance:</td><td class="fw-bold text-danger" style="font-size:1.15rem;">FRW <?php echo number_format($final_outstanding, 2); ?></td></tr>
                 <?php if ($remaining_penalties > 0): ?>
-                <tr><td class="info-label small text-muted">Includes FRW <?php echo number_format($remaining_penalties,2); ?> remaining penalties</td><td></td></tr>
+                <tr><td class="info-label small text-muted">Includes FRW <?php echo number_format($remaining_penalties, 2); ?> remaining penalties</td><td></td></tr>
                 <?php endif; ?>
                 <?php if (!empty($loan['disbursement_date'])): ?><tr><td class="info-label">Disbursement Date:</td><td><?php echo fmtDate($loan['disbursement_date']); ?></td></tr><?php endif; ?>
             </table>
@@ -673,16 +676,12 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
 </div>
 
 <!-- Fees -->
-<?php if ($total_fees > 0): ?>
+<?php if ($penalties > 0): ?>
 <div class="card mb-3">
-    <div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Fees &amp; Ecosystem Charges</h5></div>
+    <div class="card-header bg-danger text-white"><h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Penalties</h5></div>
     <div class="card-body">
         <table class="table table-borderless mb-0">
-            <?php if ($application_fees > 0): ?><tr><td class="info-label" width="35%">Application Fees:</td><td>FRW <?php echo number_format($application_fees,2); ?></td></tr><?php endif; ?>
-            <?php if ($disbursement_fees > 0): ?><tr><td class="info-label">Disbursement Fees:</td><td>FRW <?php echo number_format($disbursement_fees,2); ?></td></tr><?php endif; ?>
-            <?php if ($monitoring_fees > 0): ?><tr><td class="info-label">Monitoring Fees:</td><td>FRW <?php echo number_format($monitoring_fees,2); ?></td></tr><?php endif; ?>
-            <?php if ($penalties > 0): ?><tr><td class="info-label">Penalties:</td><td class="text-danger fw-bold">FRW <?php echo number_format($penalties,2); ?></td></tr><?php endif; ?>
-            <tr class="border-top"><td class="info-label fw-bold">Total Fees:</td><td class="fw-bold">FRW <?php echo number_format($total_fees,2); ?></td></tr>
+            <tr><td class="info-label">Accrued Penalties:</td><td class="text-danger fw-bold">FRW <?php echo number_format($penalties,2); ?></td></tr>
         </table>
     </div>
 </div>
@@ -705,7 +704,6 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                         <th class="text-end">Amount</th>
                         <th class="text-end">Principal</th>
                         <th class="text-end">Interest</th>
-                        <th class="text-end">Fee</th>
                         <th class="text-end">Penalty</th>
                         <th>Method</th>
                         <th>Reference</th>
@@ -721,7 +719,6 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                     <td class="text-end fw-bold text-success"><?php echo number_format($p['payment_amount'] ?? 0, 0); ?></td>
                     <td class="text-end text-muted"><?php echo number_format($p['principal_amount'] ?? 0, 0); ?></td>
                     <td class="text-end text-muted"><?php echo number_format($p['interest_amount'] ?? 0, 0); ?></td>
-                    <td class="text-end text-muted"><?php echo number_format($p['monitoring_fee'] ?? 0, 0); ?></td>
                     <td class="text-end text-danger"><?php echo number_format($p['penalties'] ?? 0, 0); ?></td>
                     <td><?php echo !empty($p['payment_method']) ? '<span class="badge bg-info text-dark">'.htmlspecialchars($p['payment_method']).'</span>' : '—'; ?></td>
                     <td><?php echo !empty($p['reference_number']) ? '<code>'.htmlspecialchars($p['reference_number']).'</code>' : '—'; ?></td>
@@ -781,7 +778,6 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                         <th>Due Date</th>
                         <th class="text-end">Principal</th>
                         <th class="text-end">Interest</th>
-                        <th class="text-end">Processing Fee</th>
                         <th class="text-end fw-black">Total Due</th>
                         <th class="text-end text-success">Paid</th>
                         <th class="text-end text-danger fw-bold pe-3">Balance</th>
@@ -800,12 +796,10 @@ $final_outstanding = $sum_schedule_bal + $remaining_penalties;
                     <td class="fw-bold"><?php echo fmtDate($inst['due_date']); ?></td>
                     <td class="text-end"><?php echo number_format($inst['principal_amount'], 0); ?></td>
                     <td class="text-end"><?php echo number_format($inst['interest_amount'], 0); ?></td>
-                    <td class="text-end"><?php echo number_format($inst['fees_amount'], 0); ?></td>
                     <?php
                         // Always compute total from parts
                         $computed_total = floatval($inst['principal_amount'])
-                                        + floatval($inst['interest_amount'])
-                                        + floatval($inst['fees_amount']);
+                                        + floatval($inst['interest_amount']);
                     ?>
                     <td class="text-end fw-black text-primary">FRW <?php echo number_format($computed_total, 0); ?></td>
                     <td class="text-end text-success fw-bold"><?php echo number_format($inst['amount_paid'], 0); ?></td>

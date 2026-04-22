@@ -170,17 +170,10 @@ function calculateInstalmentAmount($data)
     $interest_rate = $data['interest_rate'] / 100;
     $term_months = $data['number_of_instalments'];
 
-    // Monthly interest rate
-    $monthly_rate = $interest_rate / 12;
-
-    // Calculate instalment using annuity formula
-    if ($monthly_rate > 0) {
-        $instalment = $principal * $monthly_rate * pow(1 + $monthly_rate, $term_months) /
-            (pow(1 + $monthly_rate, $term_months) - 1);
-    }
-    else {
-        $instalment = $principal / $term_months;
-    }
+    // Flat interest calculation
+    $monthly_interest = $principal * $interest_rate;
+    $monthly_principal = $principal / $term_months;
+    $instalment = $monthly_principal + $monthly_interest;
 
     return round($instalment, 2);
 }
@@ -322,29 +315,40 @@ function recalculateRemainingSchedule($conn, $loan_id, $current_instalment_numbe
     }
 
     $num_remaining = count($future_instalments);
+    
+    // In Flat Model, interest per installment is usually fixed based on initial loan amount.
+    // However, for consistency with the system, we will calculate the flat interest 
+    // and fixed principal based on the new balance spread over remaining periods.
+    // BUT the user said "always depend on first opening balance".
+    // For re-amortization (like after partial payment), we keep the same monthly interest.
+    
+    // Fetch initial loan amount for this loan to keep interest constant
+    $loan_res = $conn->query("SELECT total_disbursed, interest_rate FROM loan_portfolio WHERE loan_id = $loan_id");
+    $loan_row = $loan_res->fetch_assoc();
+    $initial_principal = floatval($loan_row['total_disbursed']);
+    $initial_rate = floatval($loan_row['interest_rate']) / 100;
+    $fixed_monthly_interest = round($initial_principal * $initial_rate, 2);
+
     $opening_balance = $new_closing_balance;
 
     for ($i = 0; $i < $num_remaining; $i++) {
         $inst = $future_instalments[$i];
         $inst_id = $inst['instalment_id'];
-        $inst_num = $i + 1;
 
-        // Recalculate principal to amortize the rest over remaining periods
-        $principal = round(-PPMT($interest_rate, $inst_num, $num_remaining, $new_closing_balance), 2);
+        // Principal is remaining balance / remaining periods
+        $principal = round($new_closing_balance / $num_remaining, 2);
 
+        // Catch up on last installment
         if ($i == $num_remaining - 1 || ($opening_balance - $principal) < 1) {
             $principal = $opening_balance;
         }
 
-        $interest = round($opening_balance * $interest_rate, 2);
-        $mgmt_fee = floatval($inst['management_fee']);
+        $interest = $fixed_monthly_interest;
+        $mgmt_fee = 0; // Removing management fee from installments as per user request (taken upfront)
 
         $total_payment = round($principal + $interest + $mgmt_fee, 2);
         $closing_balance = max(0, round($opening_balance - $principal, 2));
 
-        // If it was already fully paid, keep it paid? 
-        // No, if we are recalculating due to deletion, it might become pending again.
-        // But if it was partially paid, we should preserve the paid amount.
         $paid_amt = floatval($inst['paid_amount']);
         $new_bal_rem = max(0, $total_payment - $paid_amt);
         $new_status = ($new_bal_rem <= 0.01) ? 'Fully Paid' : (($paid_amt > 0) ? 'Partially Paid' : 'Pending');

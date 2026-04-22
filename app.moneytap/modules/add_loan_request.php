@@ -266,14 +266,14 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
 
                         <div class="col-md-3 mt-5">
                             <label class="form-label fw-bold text-dark">Interest Rate (%)</label>
-                            <input type="number" step="0.01" name="interest_rate"
-                                class="form-control rounded-4 py-3 fw-bold" value="5.5">
+                            <input type="number" step="0.01" name="interest_rate" id="interest_rate"
+                                class="form-control rounded-4 py-3 fw-bold" value="5.5" onchange="formatAndCalc()">
                         </div>
 
                         <div class="col-md-3 mt-5">
                             <label class="form-label fw-bold text-dark">Duration (Months)</label>
-                            <input type="number" name="duration" class="form-control rounded-4 py-3 fw-bold"
-                                value="<?php echo $pre_loan_duration; ?>">
+                            <input type="number" name="duration" id="duration" class="form-control rounded-4 py-3 fw-bold"
+                                value="<?php echo $pre_loan_duration; ?>" onchange="formatAndCalc()">
                         </div>
 
                         <!-- Loan Purpose & Economic Center -->
@@ -311,23 +311,8 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
                         </div>
 
                         <div class="col-md-8 mt-4">
-                            <label class="form-label fw-bold text-dark opacity-0">Options</label>
-                            <div class="d-flex gap-3 h-100 align-items-center">
-                                <div
-                                    class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
-                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="deduct_fee"
-                                        id="deduct_fee" checked>
-                                    <label class="form-check-label small fw-bold mt-1" for="deduct_fee">Deduct from
-                                        Disbursed</label>
-                                </div>
-                                <div
-                                    class="form-check form-switch card-style-check p-2 px-3 rounded-4 flex-grow-1 bg-light border">
-                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="mgmt_first_month"
-                                        id="mgmt_first_month">
-                                    <label class="form-check-label small fw-bold mt-1" for="mgmt_first_month">First
-                                        Month Only</label>
-                                </div>
-                            </div>
+                            <input type="hidden" name="deduct_fee" id="deduct_fee" value="1">
+                            <input type="hidden" name="mgmt_first_month" id="mgmt_first_month" value="0">
                         </div>
 
                         <!-- Requested Amount (The 2% Fee) -->
@@ -639,12 +624,18 @@ $members = $conn->query("SELECT customer_id, customer_name, customer_code FROM c
         // Set internal flag for "Upfront" (1 if fully paid)
         document.getElementById('is_requested_paid_upfront').value = (reqPaidNow >= fullReqAmt) ? '1' : '0';
 
-        let disbursed = amount;
-        if (deductFee) {
-            disbursed -= (amount * (mgmtRate / 100));
-        }
+        const intRate = parseFloat(document.getElementById('interest_rate').value) || 0;
+        const duration = parseInt(document.getElementById('duration').value) || 0;
 
-        document.getElementById('totalRepayText').innerText = 'FRW ' + formatMoney(amount);
+        // Flat interest: Total Repayment = Principal + (Principal * Rate * Duration)
+        const totalInterest = amount * (intRate / 100) * duration;
+        const totalRepay = amount + totalInterest;
+
+        let disbursed = amount;
+        // Processing fee is now ALWAYS deducted from disbursed
+        disbursed -= (amount * (mgmtRate / 100));
+
+        document.getElementById('totalRepayText').innerText = 'FRW ' + formatMoney(totalRepay);
         document.getElementById('disburseBadge').innerText = 'Disbursed: FRW ' + formatMoney(disbursed);
     }
 
