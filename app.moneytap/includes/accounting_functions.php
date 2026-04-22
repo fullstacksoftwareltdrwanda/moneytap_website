@@ -43,9 +43,6 @@ function createNewLoan($conn, $data)
         // Create accounting entries
         createDisbursementJournalEntries($conn, $loan_id, $data);
 
-        // Generate payment schedule
-        generatePaymentSchedule($conn, $loan_id, $data);
-
         // Create initial accruals
         createInitialAccruals($conn, $loan_id, $data);
 
