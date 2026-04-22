@@ -1,5 +1,10 @@
 <?php
 ob_start();
+
+// Suppress warnings for end users
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', 0);
+
 include 'config/database.php';
 
 // Server-side authentication check

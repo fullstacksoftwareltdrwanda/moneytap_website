@@ -1,9 +1,9 @@
 <?php
 
-// Show ALL errors immediately — never blank page
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Suppress warnings for end users
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 
 // Catch fatal errors that would otherwise produce a blank page
 register_shutdown_function(function () {
@@ -1601,12 +1601,6 @@ function openCheckoutModal(row) {
     document.getElementById('summary_opening').textContent    = formatNumber(openingBalance);
     document.getElementById('summary_principal').textContent  = formatNumber(principal);
     document.getElementById('summary_interest').textContent   = formatNumber(interest);
-    if (requestedAmount > 0) {
-        document.getElementById('summary_requested').textContent = formatNumber(requestedAmount);
-        document.getElementById('summary_requested_container').style.display = 'flex';
-    } else {
-        document.getElementById('summary_requested_container').style.display = 'none';
-    }
 
     document.getElementById('summary_total').textContent      = formatNumber(totalPayment);
     document.getElementById('summary_closing').textContent    = formatNumber(closingBalance);
