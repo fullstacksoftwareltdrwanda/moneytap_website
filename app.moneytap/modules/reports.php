@@ -190,7 +190,8 @@ function buildPaymentsQuery($conn, $sd, $ed, $cf)
             li.total_payment, li.paid_amount, li.principal_paid, li.interest_paid,
             li.management_fee_paid, li.penalty_paid, li.balance_remaining, 
             c.customer_name, c.customer_code, lp.loan_status,
-            0.00 as disbursement_fee_paid -- Not a disbursement fee row
+            0.00 as disbursement_fee_paid, -- Not a disbursement fee row
+            li.requested_amount_paid as requested_fee_paid
         FROM loan_instalments li
         LEFT JOIN loan_portfolio lp ON li.loan_id = lp.loan_id
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
@@ -199,11 +200,12 @@ function buildPaymentsQuery($conn, $sd, $ed, $cf)
         (SELECT 
             0 as instalment_id, lp.loan_number, 0 as instalment_number, lp.disbursement_date as due_date, lp.disbursement_date as payment_date,
             0 as principal_amount, 0 as interest_amount, 0 as management_fee,
-            lp.management_fee_amount as total_payment, lp.management_fee_amount as paid_amount, 
+            lp.management_fee_amount as total_payment,            lp.management_fee_amount as paid_amount, 
             0 as principal_paid, 0 as interest_paid, 0 as management_fee_paid, 0 as penalty_paid, 
             0 as balance_remaining,
             c.customer_name, c.customer_code, lp.loan_status,
-            lp.management_fee_amount as disbursement_fee_paid
+            lp.management_fee_amount as disbursement_fee_paid,
+            0.00 as requested_fee_paid
         FROM loan_portfolio lp
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
         WHERE {$wc_lp})
@@ -428,7 +430,8 @@ function getHeaders($type)
                 'Payment Date',
                 'Principal Paid',
                 'Interest Paid',
-                'Mgmt Fee Paid',
+                'Processing Fee Paid',
+                'Application Fee Paid',
                 'Disbursement Fee',
                 'Penalty Paid',
                 'Total Collected',
@@ -656,7 +659,7 @@ function formatRows($type, $data)
             break;
 
         case 'payments':
-            $t_pp = $t_ip = $t_mfp = $t_dfp = $t_pen = $t_tc = $t_br = 0;
+            $t_pp = $t_ip = $t_mfp = $t_rfp = $t_dfp = $t_pen = $t_tc = $t_br = 0;
             foreach ($data as $r) {
                 // Logic sync with financial_report.php: Use capped amounts for I/F if fully paid, and cash for penalties
                 $is_fully_paid = ($r['balance_remaining'] <= 0 && $r['instalment_id'] > 0);
@@ -666,12 +669,14 @@ function formatRows($type, $data)
                 $p_paid_display = $r['principal_paid'] ?? 0;
                 $pen_paid_display = $r['penalty_paid'] ?? 0; // Penalties: collected cash only
                 $df_paid_display = $r['disbursement_fee_paid'] ?? 0;
+                $rf_paid_display = $r['requested_fee_paid'] ?? 0;
 
-                $total_collected = $p_paid_display + $i_paid_display + $mf_paid_display + $pen_paid_display + $df_paid_display;
+                $total_collected = $p_paid_display + $i_paid_display + $mf_paid_display + $rf_paid_display + $pen_paid_display + $df_paid_display;
 
                 $t_pp += $p_paid_display;
                 $t_ip += $i_paid_display;
                 $t_mfp += $mf_paid_display;
+                $t_rfp += $rf_paid_display;
                 $t_dfp += $df_paid_display;
                 $t_pen += $pen_paid_display;
                 $t_tc += $total_collected;
@@ -686,6 +691,7 @@ function formatRows($type, $data)
                     number_format($p_paid_display, 2),
                     number_format($i_paid_display, 2),
                     number_format($mf_paid_display, 2),
+                    number_format($rf_paid_display, 2),
                     number_format($df_paid_display, 2),
                     number_format($pen_paid_display, 2),
                     number_format($total_collected, 2),
@@ -698,10 +704,11 @@ function formatRows($type, $data)
                 $totals[5] = number_format($t_pp, 2);
                 $totals[6] = number_format($t_ip, 2);
                 $totals[7] = number_format($t_mfp, 2);
-                $totals[8] = number_format($t_dfp, 2);
-                $totals[9] = number_format($t_pen, 2);
-                $totals[10] = number_format($t_tc, 2);
-                $totals[11] = number_format($t_br, 2);
+                $totals[8] = number_format($t_rfp, 2);
+                $totals[9] = number_format($t_dfp, 2);
+                $totals[10] = number_format($t_pen, 2);
+                $totals[11] = number_format($t_tc, 2);
+                $totals[12] = number_format($t_br, 2);
             }
             break;
 
