@@ -221,7 +221,9 @@ function buildPaymentsQuery($conn, $sd, $ed, $cf)
             lr.requested_amount_paid as requested_fee_paid
         FROM loan_requests lr
         LEFT JOIN customers c ON lr.customer_id = c.customer_id
-        WHERE lr.requested_amount_paid > 0 AND lr.created_at BETWEEN '$sd 00:00:00' AND '$query_ed')
+        WHERE lr.requested_amount_paid > 0 
+        AND lr.status != 'Disbursed'
+        AND lr.created_at BETWEEN '$sd 00:00:00' AND '$query_ed')
         ORDER BY payment_date DESC";
 }
 
