@@ -635,7 +635,7 @@ switch ($report_type) {
             
             (
                 SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN li.requested_amount_paid ELSE 0 END) +
-                MAX(CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.requested_amount_paid_upfront ELSE 0 END) +
+                MAX(CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN (lp.requested_amount - IFNULL(lp.requested_amount_paid_upfront,0)) ELSE 0 END) +
                 COALESCE((SELECT SUM(lr.requested_amount_paid) FROM loan_requests lr WHERE lr.customer_id = lp.customer_id AND lr.created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' AND lr.status != 'Disbursed'), 0)
             ) as period_requested_paid,
             
@@ -651,7 +651,7 @@ switch ($report_type) {
             
             (
                 SUM(CASE WHEN li.balance_remaining <= 0 THEN li.requested_amount ELSE li.requested_amount_paid END) +
-                MAX(lp.requested_amount_paid_upfront) +
+                MAX(IFNULL(lp.requested_amount, 0)) +
                 COALESCE((SELECT SUM(lr.requested_amount_paid) FROM loan_requests lr WHERE lr.customer_id = lp.customer_id AND lr.status != 'Disbursed'), 0)
             ) as total_requested_paid,
             
