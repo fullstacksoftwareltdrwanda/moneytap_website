@@ -71,7 +71,7 @@ function createDisbursementJournalEntries($conn, $loan_id, $data)
         'reference_type' => 'loan',
         'entries' => [
             ['account_code' => '1101', 'debit' => $data['application_fees'], 'credit' => 0, 'description' => 'Bank/Cash'],
-            ['account_code' => '4204', 'debit' => 0, 'credit' => $appFeeNet, 'description' => 'Application Fee Income'],
+            ['account_code' => '4203', 'debit' => 0, 'credit' => $appFeeNet, 'description' => 'Application Fee Income'],
             ['account_code' => '2105', 'debit' => 0, 'credit' => $appFeeVAT, 'description' => 'VAT Payable']
         ]
     ]);

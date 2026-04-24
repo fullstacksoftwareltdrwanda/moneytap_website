@@ -445,7 +445,6 @@ function getHeaders($type)
                 'Interest Paid',
                 'Processing Fee Paid',
                 'Application Fee Paid',
-                'Disbursement Fee',
                 'Penalty Paid',
                 'Total Collected',
                 'Balance Remaining'
@@ -672,25 +671,28 @@ function formatRows($type, $data)
             break;
 
         case 'payments':
-            $t_pp = $t_ip = $t_mfp = $t_rfp = $t_dfp = $t_pen = $t_tc = $t_br = 0;
+            $t_pp = $t_ip = $t_pfp = $t_afp = $t_pen = $t_tc = $t_br = 0;
             foreach ($data as $r) {
                 // Logic sync with financial_report.php: Use capped amounts for I/F if fully paid, and cash for penalties
                 $is_fully_paid = ($r['balance_remaining'] <= 0 && $r['instalment_id'] > 0);
 
-                $i_paid_display = $is_fully_paid ? ($r['interest_amount'] ?? 0) : ($r['interest_paid'] ?? 0);
-                $mf_paid_display = $is_fully_paid ? ($r['management_fee'] ?? 0) : ($r['management_fee_paid'] ?? 0);
                 $p_paid_display = $r['principal_paid'] ?? 0;
-                $pen_paid_display = $r['penalty_paid'] ?? 0; // Penalties: collected cash only
-                $df_paid_display = $r['disbursement_fee_paid'] ?? 0;
-                $rf_paid_display = $r['requested_fee_paid'] ?? 0;
+                $i_paid_display = $is_fully_paid ? ($r['interest_amount'] ?? 0) : ($r['interest_paid'] ?? 0);
+                
+                // Processing Fee (4202): Combined periodic and upfront
+                $pf_periodic = $is_fully_paid ? ($r['management_fee'] ?? 0) : ($r['management_fee_paid'] ?? 0);
+                $pf_upfront = $r['disbursement_fee_paid'] ?? 0;
+                $pf_paid_display = $pf_periodic + $pf_upfront;
 
-                $total_collected = $p_paid_display + $i_paid_display + $mf_paid_display + $rf_paid_display + $pen_paid_display + $df_paid_display;
+                $af_paid_display = $r['requested_fee_paid'] ?? 0;
+                $pen_paid_display = $r['penalty_paid'] ?? 0;
+
+                $total_collected = $p_paid_display + $i_paid_display + $pf_paid_display + $af_paid_display + $pen_paid_display;
 
                 $t_pp += $p_paid_display;
                 $t_ip += $i_paid_display;
-                $t_mfp += $mf_paid_display;
-                $t_rfp += $rf_paid_display;
-                $t_dfp += $df_paid_display;
+                $t_pfp += $pf_paid_display;
+                $t_afp += $af_paid_display;
                 $t_pen += $pen_paid_display;
                 $t_tc += $total_collected;
                 $t_br += ($r['balance_remaining'] ?? 0);
@@ -703,9 +705,8 @@ function formatRows($type, $data)
                     $r['payment_date'] ? date('Y-m-d', strtotime($r['payment_date'])) : '',
                     number_format($p_paid_display, 2),
                     number_format($i_paid_display, 2),
-                    number_format($mf_paid_display, 2),
-                    number_format($rf_paid_display, 2),
-                    number_format($df_paid_display, 2),
+                    number_format($pf_paid_display, 2),
+                    number_format($af_paid_display, 2),
                     number_format($pen_paid_display, 2),
                     number_format($total_collected, 2),
                     number_format($r['balance_remaining'] ?? 0, 2),
@@ -716,12 +717,11 @@ function formatRows($type, $data)
                 $totals[0] = 'TOTAL PAYMENTS (' . count($data) . ')';
                 $totals[5] = number_format($t_pp, 2);
                 $totals[6] = number_format($t_ip, 2);
-                $totals[7] = number_format($t_mfp, 2);
-                $totals[8] = number_format($t_rfp, 2);
-                $totals[9] = number_format($t_dfp, 2);
-                $totals[10] = number_format($t_pen, 2);
-                $totals[11] = number_format($t_tc, 2);
-                $totals[12] = number_format($t_br, 2);
+                $totals[7] = number_format($t_pfp, 2);
+                $totals[8] = number_format($t_afp, 2);
+                $totals[9] = number_format($t_pen, 2);
+                $totals[10] = number_format($t_tc, 2);
+                $totals[11] = number_format($t_br, 2);
             }
             break;
 

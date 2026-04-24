@@ -426,12 +426,12 @@ function executeApproval($conn, $approval) {
 
             // 3. Credit Management Fee Income (4201) if deducted
             if ($d['deduct_fee_from_disbursed']) {
-                $m_beg = _helper_getBeginningBalance($conn, '4201', $p_date);
+                $m_beg = _helper_getBeginningBalance($conn, '4202', $p_date);
                 _helper_createLedgerEntry($conn, [
                     'transaction_date' => $p_date,
                     'class' => 'Revenue',
-                    'account_code' => '4201',
-                    'account_name' => 'Processing Fee Income',
+                    'account_code' => '4202',
+                    'account_name' => 'Disbursement Processing Fee Income',
                     'particular' => 'Upfront Processing Fee',
                     'voucher_number' => $voucher_number,
                     'narration' => $narration,
