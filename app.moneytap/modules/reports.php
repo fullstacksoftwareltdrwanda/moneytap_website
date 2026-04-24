@@ -165,66 +165,49 @@ function buildOverdueQuery($conn, $sd, $ed, $cf)
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
         WHERE {$wc} ORDER BY live_days_overdue DESC, li.due_date";
 }
-
 function buildPaymentsQuery($conn, $sd, $ed, $cf)
 {
     $sd = mysqli_real_escape_string($conn, $sd);
     $ed = mysqli_real_escape_string($conn, $ed);
     $query_ed = $ed . ' 23:59:59';
+    $cf = intval($cf);
 
-    $where_li = ["li.payment_date BETWEEN '{$sd} 00:00:00' AND '{$query_ed}'"];
-    if ($cf)
-        $where_li[] = "lp.customer_id = " . intval($cf);
-    $wc_li = implode(' AND ', $where_li);
+    $where_li = "li.payment_date BETWEEN '$sd 00:00:00' AND '$query_ed'";
+    if ($cf > 0) $where_li .= " AND lp.customer_id = $cf";
 
-    $where_lp = ["lp.disbursement_date BETWEEN '{$sd} 00:00:00' AND '{$query_ed}'"];
-    if ($cf)
-        $where_lp[] = "lp.customer_id = " . intval($cf);
-    // Only capture if it's a "Disbursement Processing Fee" (instalment 1 processing fee is 0)
-    $where_lp[] = "(SELECT management_fee FROM loan_instalments WHERE loan_id = lp.loan_id AND instalment_number = 1 LIMIT 1) = 0";
-    $wc_lp = implode(' AND ', $where_lp);
+    $where_ledger = "l.transaction_date BETWEEN '$sd' AND '$ed' AND l.account_code IN ('4201', '4202', '4203', '4204')";
+    if ($cf > 0) $where_ledger .= " AND lp.customer_id = $cf";
 
-    return "(SELECT 
+    $sql = "SELECT 
             li.instalment_id, li.loan_number, li.instalment_number, li.due_date, li.payment_date,
             li.principal_amount, li.interest_amount, li.management_fee,
             li.total_payment, li.paid_amount, li.principal_paid, li.interest_paid,
             li.management_fee_paid, li.penalty_paid, li.balance_remaining, 
             c.customer_name, c.customer_code, lp.loan_status,
-            0.00 as disbursement_fee_paid, -- Not a disbursement fee row
+            0.00 as disbursement_fee_paid, 
             li.requested_amount_paid as requested_fee_paid
         FROM loan_instalments li
         LEFT JOIN loan_portfolio lp ON li.loan_id = lp.loan_id
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
-        WHERE {$wc_li})
+        WHERE $where_li
         UNION ALL
-        (SELECT 
-            0 as instalment_id, lp.loan_number, 0 as instalment_number, lp.disbursement_date as due_date, lp.disbursement_date as payment_date,
+        SELECT 
+            0 as instalment_id, lp.loan_number, 0 as instalment_number, lp.disbursement_date as due_date, l.transaction_date as payment_date,
             0 as principal_amount, 0 as interest_amount, 0 as management_fee,
-            lp.management_fee_amount as total_payment,            lp.management_fee_amount as paid_amount, 
+            SUM(l.credit_amount) as total_payment, SUM(l.credit_amount) as paid_amount, 
             0 as principal_paid, 0 as interest_paid, 0 as management_fee_paid, 0 as penalty_paid, 
             0 as balance_remaining,
             c.customer_name, c.customer_code, lp.loan_status,
-            lp.management_fee_amount as disbursement_fee_paid,
-            lp.requested_amount_paid_upfront as requested_fee_paid
-        FROM loan_portfolio lp
+            SUM(CASE WHEN l.account_code IN ('4201', '4202') THEN l.credit_amount ELSE 0 END) as disbursement_fee_paid,
+            SUM(CASE WHEN l.account_code IN ('4203', '4204') THEN l.credit_amount ELSE 0 END) as requested_fee_paid
+        FROM ledger l
+        INNER JOIN loan_portfolio lp ON l.reference_id = lp.loan_id AND l.reference_type = 'loan_disbursement'
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
-        WHERE {$wc_lp})
-        UNION ALL
-        (SELECT 
-            0 as instalment_id, 'REQ' as loan_number, 0 as instalment_number, lr.created_at as due_date, lr.created_at as payment_date,
-            0 as principal_amount, 0 as interest_amount, 0 as management_fee,
-            lr.requested_amount_paid as total_payment, lr.requested_amount_paid as paid_amount, 
-            0 as principal_paid, 0 as interest_paid, 0 as management_fee_paid, 0 as penalty_paid, 
-            0 as balance_remaining,
-            c.customer_name, c.customer_code, lr.status as loan_status,
-            0 as disbursement_fee_paid,
-            lr.requested_amount_paid as requested_fee_paid
-        FROM loan_requests lr
-        LEFT JOIN customers c ON lr.customer_id = c.customer_id
-        WHERE lr.requested_amount_paid > 0 
-        AND lr.status != 'Disbursed'
-        AND lr.created_at BETWEEN '$sd 00:00:00' AND '$query_ed')
+        WHERE $where_ledger
+        GROUP BY lp.loan_id, l.transaction_date
         ORDER BY payment_date DESC";
+    
+    return $sql;
 }
 
 function buildProvisionsQuery($conn, $sd, $ed, $cf)
