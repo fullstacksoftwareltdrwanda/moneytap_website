@@ -85,7 +85,7 @@ function handleEditFileUpload($field_name, $upload_dir, $old_file = '') {
         $ext = pathinfo($_FILES[$field_name]['name'], PATHINFO_EXTENSION);
         $filename = $field_name . '_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
         if (move_uploaded_file($_FILES[$field_name]['tmp_name'], $upload_dir . $filename)) {
-            return $filename;
+            return 'uploads/documents/' . $filename;
         }
     }
     return $old_file;

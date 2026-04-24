@@ -380,10 +380,12 @@ function recalculateRemainingSchedule($conn, $loan_id, $current_instalment_numbe
  */
 function syncLoanPortfolio($conn, $loan_id)
 {
-    // 0. Update days_overdue for installments
+    // 0. Update days_overdue and penalties for installments
+    // Logic: 1% per day of the total payment amount
     $conn->query("UPDATE loan_instalments SET 
-        days_overdue = GREATEST(0, DATEDIFF(CURDATE(), due_date)) 
-        WHERE loan_id = $loan_id AND payment_date IS NULL");
+        days_overdue = GREATEST(0, DATEDIFF(CURDATE(), due_date)),
+        penalty_amount = GREATEST(0, DATEDIFF(CURDATE(), due_date)) * 0.01 * total_payment
+        WHERE loan_id = $loan_id AND status != 'Fully Paid'");
 
     // 0b. REPAIR CONTINUITY: Ensure each pending installment opens with the previous one's closing balance
     $inst_res = $conn->query("SELECT * FROM loan_instalments WHERE loan_id = $loan_id ORDER BY instalment_number ASC");
@@ -404,15 +406,16 @@ function syncLoanPortfolio($conn, $loan_id)
         lp.total_interest_paid  = (SELECT IFNULL(SUM(interest_paid), 0)  FROM loan_instalments WHERE loan_id = lp.loan_id),
         lp.total_management_fees_paid = (SELECT IFNULL(SUM(management_fee_paid), 0) FROM loan_instalments WHERE loan_id = lp.loan_id),
         lp.total_paid = (SELECT IFNULL(SUM(paid_amount), 0) FROM loan_instalments WHERE loan_id = lp.loan_id),
-        lp.days_overdue = (SELECT IFNULL(MAX(days_overdue), 0) FROM loan_instalments WHERE loan_id = lp.loan_id AND payment_date IS NULL)
+        lp.days_overdue = (SELECT IFNULL(MAX(days_overdue), 0) FROM loan_instalments WHERE loan_id = lp.loan_id AND status != 'Fully Paid'),
+        lp.penalties = (SELECT IFNULL(SUM(penalty_amount), 0) FROM loan_instalments WHERE loan_id = lp.loan_id)
         WHERE lp.loan_id = $loan_id");
 
     // 2. Update outstanding balances
-    // total_outstanding should be the SUM of balance_remaining from all installments
+    // total_outstanding should be the SUM of balance_remaining + remaining penalties
     $sync_q = "UPDATE loan_portfolio lp SET 
                lp.principal_outstanding = GREATEST(0, (SELECT IFNULL(SUM(principal_amount), 0) FROM loan_instalments WHERE loan_id = lp.loan_id) - lp.total_principal_paid),
                lp.interest_outstanding  = GREATEST(0, (SELECT IFNULL(SUM(interest_amount), 0)  FROM loan_instalments WHERE loan_id = lp.loan_id) - lp.total_interest_paid),
-               lp.total_outstanding     = (SELECT IFNULL(SUM(balance_remaining), 0)        FROM loan_instalments WHERE loan_id = lp.loan_id),
+               lp.total_outstanding     = (SELECT IFNULL(SUM(balance_remaining + (penalty_amount - penalty_paid)), 0) FROM loan_instalments WHERE loan_id = lp.loan_id),
                lp.updated_at            = NOW()
                WHERE lp.loan_id = ?";
     $sync_st = $conn->prepare($sync_q);

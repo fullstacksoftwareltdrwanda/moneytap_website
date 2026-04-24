@@ -209,12 +209,15 @@ $resubbed = !empty($customer['resubmitted_fields']) ? explode(',', $customer['re
                         'doc_statement' => 'Bank Statement',
                         'doc_payslip' => 'Latest Payslip',
                         'doc_marital' => 'Marital Certificate',
-                        'doc_rdb' => 'RDB Certificate'
+                        'doc_rdb' => 'RDB Certificate',
+                        'doc_loan_clearance' => 'Loan Clearance',
+                        'doc_power_of_attorney' => 'Power of Attorney'
                     ];
                     
                     foreach($docs as $key => $label): 
                         if(!empty($customer[$key])):
-                            $doc_url = $customer[$key]; 
+                            $doc_path = $customer[$key];
+                            $doc_url = (strpos($doc_path, 'uploads/') === false) ? 'uploads/documents/' . $doc_path : $doc_path; 
                             $file_ext = strtolower(pathinfo($customer[$key], PATHINFO_EXTENSION));
                             $is_image = in_array($file_ext, ['jpg', 'jpeg', 'png', 'gif']);
                     ?>
@@ -275,7 +278,8 @@ $resubbed = !empty($customer['resubmitted_fields']) ? explode(',', $customer['re
                                     'province' => 'Province', 'location' => 'District/Area',
                                     'doc_id' => 'ID Copy', 'doc_contract' => 'Contract',
                                     'doc_statement' => 'Statement', 'doc_payslip' => 'Payslip', 
-                                    'doc_marital' => 'Marital Cert', 'doc_rdb' => 'RDB Cert'
+                                    'doc_marital' => 'Marital Cert', 'doc_rdb' => 'RDB Cert',
+                                    'doc_loan_clearance' => 'Loan Clearance', 'doc_power_of_attorney' => 'Power of Attorney'
                                 ];
                                 foreach($all_fields as $f_key => $f_label): 
                                 ?>
