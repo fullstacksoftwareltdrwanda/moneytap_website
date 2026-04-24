@@ -478,12 +478,12 @@ try {
                     }
 
                     if ($total_mgmt_credited > 0) {
-                        $m_beg = getBeginningBalance($conn, '4201', $payment_date);
+                        $m_beg = getBeginningBalance($conn, '4202', $payment_date);
                         createLedgerEntry($conn, [
                             'transaction_date' => $payment_date,
                             'class' => 'Fee Income',
-                            'account_code' => '4201',
-                            'account_name' => 'Processing Fee Income',
+                            'account_code' => '4202',
+                            'account_name' => 'Disbursement Processing Fee Income',
                             'particular' => 'Processing Fee - Current Instalment Only (Future Waived)',
                             'voucher_number' => $voucher_number,
                             'narration' => $narration,
@@ -753,8 +753,24 @@ try {
                         createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Revenue', 'account_code' => '4101', 'account_name' => 'Interest Income', 'particular' => 'Interest Income', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_i_pd, 'movement' => $total_i_pd, 'ending_balance' => $beg + $total_i_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
                     }
                     if ($total_m_pd > 0) {
-                        $beg = getBeginningBalance($conn, '4201', $payment_date);
-                        createLedgerEntry($conn, ['transaction_date' => $payment_date, 'class' => 'Fee Income', 'account_code' => '4201', 'account_name' => 'Processing Fee Income', 'particular' => 'Processing Fee Payment', 'voucher_number' => $voucher_number, 'narration' => $narration, 'beginning_balance' => $beg, 'debit_amount' => 0, 'credit_amount' => $total_m_pd, 'movement' => $total_m_pd, 'ending_balance' => $beg + $total_m_pd, 'reference_type' => 'loan_payment', 'reference_id' => $instalment_id, 'created_by' => $created_by]);
+                        $beg = getBeginningBalance($conn, '4202', $payment_date);
+                        createLedgerEntry($conn, [
+                            'transaction_date' => $payment_date, 
+                            'class' => 'Fee Income', 
+                            'account_code' => '4202', 
+                            'account_name' => 'Disbursement Processing Fee Income', 
+                            'particular' => 'Processing Fee Payment', 
+                            'voucher_number' => $voucher_number, 
+                            'narration' => $narration, 
+                            'beginning_balance' => $beg, 
+                            'debit_amount' => 0, 
+                            'credit_amount' => $total_m_pd, 
+                            'movement' => $total_m_pd, 
+                            'ending_balance' => $beg + $total_m_pd, 
+                            'reference_type' => 'loan_payment', 
+                            'reference_id' => $instalment_id, 
+                            'created_by' => $created_by
+                        ]);
                     }
                     if ($total_r_pd > 0) {
                         $beg = getBeginningBalance($conn, '4203', $payment_date);

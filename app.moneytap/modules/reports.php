@@ -205,10 +205,23 @@ function buildPaymentsQuery($conn, $sd, $ed, $cf)
             0 as balance_remaining,
             c.customer_name, c.customer_code, lp.loan_status,
             lp.management_fee_amount as disbursement_fee_paid,
-            0.00 as requested_fee_paid
+            lp.requested_amount_paid_upfront as requested_fee_paid
         FROM loan_portfolio lp
         LEFT JOIN customers c ON lp.customer_id = c.customer_id
         WHERE {$wc_lp})
+        UNION ALL
+        (SELECT 
+            0 as instalment_id, 'REQ' as loan_number, 0 as instalment_number, lr.created_at as due_date, lr.created_at as payment_date,
+            0 as principal_amount, 0 as interest_amount, 0 as management_fee,
+            lr.requested_amount_paid as total_payment, lr.requested_amount_paid as paid_amount, 
+            0 as principal_paid, 0 as interest_paid, 0 as management_fee_paid, 0 as penalty_paid, 
+            0 as balance_remaining,
+            c.customer_name, c.customer_code, lr.status as loan_status,
+            0 as disbursement_fee_paid,
+            lr.requested_amount_paid as requested_fee_paid
+        FROM loan_requests lr
+        LEFT JOIN customers c ON lr.customer_id = c.customer_id
+        WHERE lr.requested_amount_paid > 0 AND lr.created_at BETWEEN '$sd 00:00:00' AND '$query_ed')
         ORDER BY payment_date DESC";
 }
 

@@ -134,11 +134,25 @@ function calculateTrialBalance($conn, $start_date, $end_date) {
                 $period_credit = roundAmount(floatval(mysqli_fetch_assoc($res_move_c)['mc'] ?? 0));
 
             } elseif ($account_code === '4202') {
-                // Disbursement Fee
-                $res_open = mysqli_query($conn, "SELECT SUM(management_fee_amount) as op FROM loan_portfolio lp WHERE disbursement_date < '$start_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
-                $initial_balance = -roundAmount(floatval(mysqli_fetch_assoc($res_open)['op'] ?? 0));
-                $res_move = mysqli_query($conn, "SELECT SUM(management_fee_amount) as mp FROM loan_portfolio lp WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
-                $period_credit = roundAmount(floatval(mysqli_fetch_assoc($res_move)['mp'] ?? 0));
+                // Disbursement Processing Fee (Upfront + Installments)
+                // 1. Upfront from Portfolio
+                $res_upfront_open = mysqli_query($conn, "SELECT SUM(management_fee_amount) as op FROM loan_portfolio WHERE disbursement_date < '$start_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
+                $upfront_open = floatval(mysqli_fetch_assoc($res_upfront_open)['op'] ?? 0);
+                
+                // 2. Installments from loan_instalments
+                $res_inst_open = mysqli_query($conn, "SELECT SUM(management_fee_paid) as op FROM loan_instalments WHERE payment_date < '$start_date 00:00:00'");
+                $inst_open = floatval(mysqli_fetch_assoc($res_inst_open)['op'] ?? 0);
+                
+                $initial_balance = -roundAmount($upfront_open + $inst_open);
+
+                // Movements
+                $res_upfront_move = mysqli_query($conn, "SELECT SUM(management_fee_amount) as mp FROM loan_portfolio WHERE disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' AND (deduct_fee_from_disbursed = 1 OR mgmt_fee_first_month_only = 1)");
+                $upfront_move = floatval(mysqli_fetch_assoc($res_upfront_move)['mp'] ?? 0);
+                
+                $res_inst_move = mysqli_query($conn, "SELECT SUM(management_fee_paid) as mp FROM loan_instalments WHERE payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59'");
+                $inst_move = floatval(mysqli_fetch_assoc($res_inst_move)['mp'] ?? 0);
+                
+                $period_credit = roundAmount($upfront_move + $inst_move);
             } elseif ($account_code === '4203') {
                 // Requested Amount Income (4203)
                 // Source 1: Upfront payments from loan_requests (this is recognized at the moment of request)
@@ -608,36 +622,40 @@ switch ($report_type) {
                  (CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END)
             ELSE 0 END) as period_interest_paid,
             
-            SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN 
-                 li.management_fee_paid
-            ELSE 0 END) as period_fee_paid,
+            -- Paid during the selected period (Combined Upfront + Instalments)
+            (
+                SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN li.management_fee_paid ELSE 0 END) +
+                MAX(CASE WHEN (lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1) AND lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.management_fee_amount ELSE 0 END)
+            ) as period_fee_paid,
             
             SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN 
                  li.penalty_paid
             ELSE 0 END) as period_penalty_paid,
             
-            SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN 
-                 li.requested_amount_paid
-            ELSE 0 END) as period_requested_paid,
+            (
+                SUM(CASE WHEN li.payment_date BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' THEN li.requested_amount_paid ELSE 0 END) +
+                MAX(CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.requested_amount_paid_upfront ELSE 0 END) +
+                COALESCE((SELECT SUM(lr.requested_amount_paid) FROM loan_requests lr WHERE lr.customer_id = lp.customer_id AND lr.created_at BETWEEN '$start_date 00:00:00' AND '$query_end_date 23:59:59' AND lr.status != 'Disbursed'), 0)
+            ) as period_requested_paid,
                 
-            -- Disbursement Processing Fee: ONLY if upfront options are selected
-            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
-                 (CASE WHEN lp.disbursement_date BETWEEN '$start_date 00:00:00' AND '$query_end_date' THEN lp.management_fee_amount ELSE 0 END)
-            ELSE 0 END as disb_fee_period,
+            -- Totals to date (Combined Upfront + Instalments EVER)
+            (
+                SUM(CASE WHEN li.balance_remaining <= 0 THEN li.management_fee ELSE li.management_fee_paid END) +
+                MAX(CASE WHEN (lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1) THEN lp.management_fee_amount ELSE 0 END)
+            ) as total_fee_paid,
             
-            CASE WHEN lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1 THEN 
-                 lp.management_fee_amount
-            ELSE 0 END as total_disb_fee,
-            
-            -- Totals to date (all payments EVER made on this loan, capped if fully paid)
-            SUM(CASE WHEN li.balance_remaining <= 0 THEN li.interest_amount ELSE li.interest_paid END) as total_interest_paid,
-            SUM(CASE WHEN li.balance_remaining <= 0 THEN li.management_fee ELSE li.management_fee_paid END) as total_fee_paid,
             SUM(CASE WHEN li.balance_remaining <= 0 THEN li.penalty_amount ELSE li.penalty_paid END) as total_penalty_paid,
-            SUM(CASE WHEN li.balance_remaining <= 0 THEN li.requested_amount ELSE li.requested_amount_paid END) as total_requested_paid,
+            
+            (
+                SUM(CASE WHEN li.balance_remaining <= 0 THEN li.requested_amount ELSE li.requested_amount_paid END) +
+                MAX(lp.requested_amount_paid_upfront) +
+                COALESCE((SELECT SUM(lr.requested_amount_paid) FROM loan_requests lr WHERE lr.customer_id = lp.customer_id AND lr.status != 'Disbursed'), 0)
+            ) as total_requested_paid,
             
             -- Total expected for comparison
             SUM(li.interest_amount) as total_interest_exp,
-            SUM(li.management_fee) as total_fee_exp,
+            (SUM(li.management_fee) + MAX(CASE WHEN (lp.deduct_fee_from_disbursed = 1 OR lp.mgmt_fee_first_month_only = 1) THEN lp.management_fee_amount ELSE 0 END)) as total_fee_exp,
+            (SUM(li.requested_amount) + MAX(lp.requested_amount_paid_upfront) + COALESCE((SELECT SUM(lr.requested_amount_paid) FROM loan_requests lr WHERE lr.customer_id = lp.customer_id AND lr.status != 'Disbursed'), 0)) as total_requested_exp,
             SUM(li.penalty_amount) as total_penalty_exp
             
             FROM loan_portfolio lp
