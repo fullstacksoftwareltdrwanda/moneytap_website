@@ -57,7 +57,7 @@ $currentPage = getCurrentPage();
                     <div class="h-6 w-[1px] bg-white/10 mx-4"></div>
 
                     <a href="apply.php" class="btn-primary py-2 px-6 text-[10px]">Apply Now</a>
-                    <a href="app.moneytap/login.php" target="_blank" class="p-3 text-neutral-body hover:text-brand-primary transition-colors" title="System Portal">
+                    <a href="https://app.loanms.rw/login" target="_blank" class="p-3 text-neutral-body hover:text-brand-primary transition-colors" title="System Portal">
                         <i class="fas fa-user-shield text-sm"></i>
                     </a>
                 </div>
